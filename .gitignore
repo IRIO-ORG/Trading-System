@@ -1,0 +1,36 @@
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+.vscode
+.history/
+*.vsix
+.history
+.idea
+out/
+# Kate
+.*.kate-swp
+.swp.*
+# Vim
+[._]*.s[a-v][a-z]
+!*.svg
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+Session.vim
+Sessionx.vim
+.netrwhist
+tags
+[._]*.un~
+# Bazel
+/bazel-*
+/.ijwb/
