@@ -1,0 +1,44 @@
+# k8s/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: afe-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: afe
+  template:
+    metadata:
+      labels:
+        app: afe
+    spec:
+      containers:
+        - name: afe
+          image: ghcr.io/irio-org/trading-system/afe:latest
+          imagePullPolicy: Always
+          env:
+            - name: KAFKA_BROKER_ADDR
+              value: "my-kafka:9092"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/irio-org/trading-system/worker:latest
+          imagePullPolicy: Always
+          env:
+            - name: KAFKA_BROKER_ADDR
+              value: "my-kafka:9092"

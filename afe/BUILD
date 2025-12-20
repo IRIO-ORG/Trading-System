@@ -42,4 +42,5 @@ go_library(
     srcs = ["main.go"],
     importpath = "github.com/IRIO-ORG/Trading-System/afe",
     visibility = ["//visibility:private"],
+    deps = ["@com_github_ibm_sarama//:sarama"],
 )
