@@ -1,0 +1,41 @@
+# k8s/topics-job.yaml
+# One-shot Job that creates the required topics.
+# Run after Kafka is installed:
+#   kubectl apply -f k8s/topics-job.yaml
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-create-topics
+spec:
+  backoffLimit: 6
+  template:
+    metadata:
+      labels:
+        app: kafka-topics
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: kafka-topics
+          image: docker.io/bitnamilegacy/kafka:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - bash
+            - -ec
+            - |
+              BOOTSTRAP="my-kafka:9092"
+
+              echo "Waiting for Kafka at ${BOOTSTRAP} ..."
+              until /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server "${BOOTSTRAP}" --list >/dev/null 2>&1; do
+                sleep 5
+              done
+
+              echo "Creating topics (idempotent) ..."
+              /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server "${BOOTSTRAP}" --create --if-not-exists --topic trades --partitions 1 --replication-factor 1
+
+              /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server "${BOOTSTRAP}" --create --if-not-exists --topic executed-trades --partitions 1 --replication-factor 1
+
+              /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server "${BOOTSTRAP}" --create --if-not-exists --topic orderbook-snapshots --partitions 1 --replication-factor 1 --config cleanup.policy=compact
+
+              echo "Done. Topics are:"
+              /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server "${BOOTSTRAP}" --list

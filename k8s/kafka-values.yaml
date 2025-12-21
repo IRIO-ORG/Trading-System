@@ -1,0 +1,26 @@
+# helm install my-kafka oci://registry-1.docker.io/bitnamicharts/kafka -f k8s/kafka-values.yaml
+
+kraft:
+  enabled: true
+
+zookeeper:
+  enabled: false
+
+controller:
+  replicaCount: 1
+
+listeners:
+  client:
+    protocol: PLAINTEXT
+  interbroker:
+    protocol: PLAINTEXT
+
+allowPlaintextListener: true
+
+image:
+  registry: docker.io
+  repository: bitnamilegacy/kafka
+
+persistence:
+  enabled: true
+  size: 10Gi
