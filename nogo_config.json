@@ -1,0 +1,10 @@
+{
+  "_base": {
+    "exclude_files": {
+      "^bazel-out/": "Ignore generated files",
+      "^bazel-bin/": "Ignore generated files",
+      "^bazel-testlogs/": "Ignore generated files",
+      "^bazel-IRIO/": "Ignore generated files"
+    }
+  }
+}

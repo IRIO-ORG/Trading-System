@@ -5,6 +5,7 @@ gazelle(name = "gazelle")
 
 nogo(
     name = "nogo",
+    config = "nogo_config.json",
     visibility = ["//visibility:public"],
     deps = [
         "@org_golang_x_tools//go/analysis/passes/asmdecl",
