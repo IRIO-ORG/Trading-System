@@ -1,0 +1,16 @@
+syntax = "proto3";
+package trading_system;
+
+option go_package = "github.com/IRIO-ORG/Trading-System/proto";
+
+import "proto/market_data.proto";
+
+service ApplicationFrontend {
+  rpc SubmitTrade(TradeRequest) returns (TradeResponse);
+}
+
+message TradeRequest {
+  Trade trade = 1;
+}
+
+message TradeResponse {}
