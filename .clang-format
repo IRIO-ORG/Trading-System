@@ -1,0 +1,4 @@
+---
+# Protocol Buffers Configuration
+Language: Proto
+BasedOnStyle: Google
