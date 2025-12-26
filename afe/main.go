@@ -1,22 +1,33 @@
 package main
 
 import (
+	"flag"
 	"fmt"
-	"log"
+	"log/slog"
+	"net"
 	"os"
 	"time"
 
 	"github.com/IBM/sarama"
+	"github.com/IRIO-ORG/Trading-System/common"
+	pb "github.com/IRIO-ORG/Trading-System/proto"
+	"google.golang.org/grpc"
 )
 
-func main() {
+var (
+	grpcBindAddress = flag.String("bind_address", "", "Address of the server interface")
+	grpcPort        = flag.Int("grpc_port", 50051, "The gRPC server port")
+)
+
+const RequestsTopic = "trading-updates"
+
+func makeProducer() (sarama.SyncProducer, error) {
 	kafkaAddr := os.Getenv("KAFKA_BROKER_ADDR")
 	if kafkaAddr == "" {
 		kafkaAddr = "my-kafka:9092" // Default address in K8s (Bitnami)
 	}
-	topic := "trading-updates"
 
-	fmt.Printf("AFE: Connecting to Kafka at %s...\n", kafkaAddr)
+	slog.Info("AFE: Connecting to Kafka...", "address", kafkaAddr)
 
 	config := sarama.NewConfig()
 	config.Producer.Return.Successes = true
@@ -29,30 +40,38 @@ func main() {
 		if err == nil {
 			break
 		}
-		fmt.Printf("AFE: Waiting for Kafka... (%v)\n", err)
+		slog.Info("AFE: Waiting for Kafka...\n", "error", err)
 		time.Sleep(5 * time.Second)
 	}
 	if err != nil {
-		log.Fatalf("AFE: Failed to start producer: %v", err)
+		return nil, fmt.Errorf("Failed to start producer: %v", err)
+	}
+	slog.Info("AFE: Connected!")
+	return producer, nil
+}
+
+func main() {
+	flag.Parse()
+
+	producer, err := makeProducer()
+	if err != nil {
+		slog.Error("MakeProducer failed", "error", err)
+		os.Exit(1)
 	}
 	defer producer.Close()
 
-	fmt.Println("AFE: Connected! Starting to produce...")
+	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", *grpcBindAddress, *grpcPort))
+	if err != nil {
+		slog.Error("Failed to listen", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("Listening for gRPCs", "address", lis.Addr())
 
-	for {
-		msgValue := fmt.Sprintf("Trade event at %s", time.Now().Format(time.RFC3339))
-		msg := &sarama.ProducerMessage{
-			Topic: topic,
-			Value: sarama.StringEncoder(msgValue),
-		}
-
-		partition, offset, err := producer.SendMessage(msg)
-		if err != nil {
-			log.Printf("AFE: Failed to send message: %v\n", err)
-		} else {
-			fmt.Printf("AFE: Message sent to partition %d at offset %d: %s\n", partition, offset, msgValue)
-		}
-
-		time.Sleep(5 * time.Second)
+	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(common.LoggingInterceptor))
+	afeServer := makeAfeServer(RequestsTopic, producer)
+	pb.RegisterApplicationFrontendServer(grpcServer, afeServer)
+	if err := grpcServer.Serve(lis); err != nil {
+		slog.Error("Failed to serve gRPC", "error", err)
+		os.Exit(1)
 	}
 }
