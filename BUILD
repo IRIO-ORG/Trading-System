@@ -23,7 +23,6 @@ nogo(
         "@org_golang_x_tools//go/analysis/passes/defers",
         "@org_golang_x_tools//go/analysis/passes/directive",
         "@org_golang_x_tools//go/analysis/passes/errorsas",
-        "@org_golang_x_tools//go/analysis/passes/fieldalignment",
         "@org_golang_x_tools//go/analysis/passes/findcall",
         "@org_golang_x_tools//go/analysis/passes/framepointer",
         "@org_golang_x_tools//go/analysis/passes/httpresponse",
