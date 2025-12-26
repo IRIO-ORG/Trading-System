@@ -1,0 +1,40 @@
+name: Pull request checks
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - ready_for_review
+      - synchronize
+    branches:
+      - main
+env:
+  VALIDATE_ALL_CODEBASE: false
+  VALIDATE_GITHUB_ACTIONS: true
+  VALIDATE_GITLEAKS: true
+  VALIDATE_GO_MODULES: true
+  VALIDATE_KUBERNETES_KUBECONFORM: true
+  VALIDATE_MARKDOWN: true
+  VALIDATE_PROTOBUF: true
+  VALIDATE_YAML: true
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-formatting:
+    name: Check code formatting
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Super-linter
+        uses: super-linter/super-linter/slim@v8.3.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
