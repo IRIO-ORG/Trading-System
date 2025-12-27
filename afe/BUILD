@@ -39,8 +39,18 @@ go_binary(
 
 go_library(
     name = "afe_lib",
-    srcs = ["main.go"],
+    srcs = [
+        "main.go",
+        "server.go",
+    ],
     importpath = "github.com/IRIO-ORG/Trading-System/afe",
     visibility = ["//visibility:private"],
-    deps = ["@com_github_ibm_sarama//:sarama"],
+    deps = [
+        "//common",
+        "//proto",
+        "@com_github_ibm_sarama//:sarama",
+        "@org_golang_google_grpc//:grpc",
+        "@org_golang_google_protobuf//proto",
+        "@org_golang_google_protobuf//types/known/timestamppb",
+    ],
 )
