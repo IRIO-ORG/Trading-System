@@ -38,3 +38,18 @@ jobs:
         uses: super-linter/super-linter/slim@v8.3.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    name: Build all packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: bazel-contrib/setup-bazel@0.16.0
+      - name: Build all Bazel artifacts
+        run: |
+          bazel build //...
