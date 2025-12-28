@@ -27,12 +27,12 @@ func dumpTradeInternal(raw []byte) {
 
 	fmt.Printf(
 	"DUMP: request_id=%s symbol=%s side=%s price=%d size=%d received_at=%s\n",
-	ti.RequestId,
-	symbol,
-	sideToString(t),
-	t.GetPrice(),
-	t.GetSize(),
-	received.UTC().Format(time.RFC3339Nano)
+		ti.RequestId,
+		symbol,
+		sideToString(t),
+		t.GetPrice(),
+		t.GetSize(),
+		received.UTC().Format(time.RFC3339Nano)
 	)
 }
 
@@ -43,7 +43,7 @@ func sideToString(t *pb.Trade) string {
 	switch t.Side {
 	case pb.Side_BUY:
 		return "BUY"
-	casde pb.Side_SELL:
+	case pb.Side_SELL:
 		return "SELL"
 	default:
 		return "UNKNOWN"
