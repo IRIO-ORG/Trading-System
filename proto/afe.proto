@@ -11,6 +11,7 @@ service ApplicationFrontend {
 
 message TradeRequest {
   Trade trade = 1;
+  string request_id = 2;
 }
 
 message TradeResponse {}
