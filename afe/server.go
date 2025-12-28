@@ -5,11 +5,16 @@ import (
 	"fmt"
 	"log/slog"
 	"time"
+	"crypto/rand"
+	"encoding/hex"
+	"strings"
 
 	"github.com/IBM/sarama"
 	pb "github.com/IRIO-ORG/Trading-System/proto"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type afeServer struct {
@@ -26,15 +31,39 @@ func makeAfeServer(requestsTopic string, producer sarama.SyncProducer) pb.Applic
 }
 
 func (s *afeServer) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.TradeResponse, error) {
-	msgValue, err := proto.Marshal(&pb.TradeEvent{
-		Trade:      req.GetTrade(),
-		ReceivedAt: timestamppb.New(time.Now()),
-	})
+	if req == nil || req.Trade == nil || req.Trade.Instrument == nil {
+		return nil, status.Error(codes.InvalidArgument, "missing trade.instrument")
+	}
+	symbol := strings.ToUpper(strings.Trimspace(req.Trade.Instrument.Symbol))
+	if symbol == "" {
+		return nil, status.Error(codes.InvalidArgument, "instrument.symbol is required")
+	}
+	if req.Trade.Size == 0 {
+		return nil, status.Error(codes.InvalidArgument, "size must be > 0")
+	}
+	if req.Trade.Price == 0 {
+		return nil, status.Error(codes.InvalidArgument, "price must be > 0")
+	}
+
+	requestID := strings.TrimSpace(req.RequestId)
+	if requestID == "" {
+		requestID = newRequestID
+	}
+
+	ti := &pb.TradeEvent {
+		Trade: 		req.Trade
+		ReceivedAt: timestamppb.Now()
+		RequestId: 	requestID
+	}
+	ti.Trade.Instrument.Symbol = symbol
+
+	msgValue, err := proto.Marshal(ti)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to Marshal to TradeEvent: [%v]", err)
 	}
 	msg := &sarama.ProducerMessage{
 		Topic: s.requestsTopic,
+		Key:   sarama.StringEncoder(symbol)
 		Value: sarama.ByteEncoder(msgValue),
 	}
 
@@ -45,4 +74,12 @@ func (s *afeServer) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.
 		slog.Debug("AFE: Message sent!", "partition", partition, "offset", offset, "message", msgValue)
 	}
 	return &pb.TradeResponse{}, nil
+}
+
+func newRequestID() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Sprintf("req-%d", timestamppb.Now().AsTime().UnixNano())
+	}
+	return hex.EncodeToString(b)
 }
