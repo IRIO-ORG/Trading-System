@@ -34,7 +34,7 @@ func (s *afeServer) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.
 	if req == nil || req.Trade == nil || req.Trade.Instrument == nil {
 		return nil, status.Error(codes.InvalidArgument, "missing trade.instrument")
 	}
-	symbol := strings.ToUpper(strings.Trimspace(req.Trade.Instrument.Symbol))
+	symbol := strings.ToUpper(strings.TrimSpace(req.Trade.Instrument.Symbol))
 	if symbol == "" {
 		return nil, status.Error(codes.InvalidArgument, "instrument.symbol is required")
 	}
@@ -47,7 +47,7 @@ func (s *afeServer) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.
 
 	requestID := strings.TrimSpace(req.RequestId)
 	if requestID == "" {
-		requestID = newRequestID
+		requestID = newRequestID()
 	}
 
 	ti := &pb.TradeEvent {
@@ -63,7 +63,7 @@ func (s *afeServer) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.
 	}
 	msg := &sarama.ProducerMessage{
 		Topic: s.requestsTopic,
-		Key:   sarama.StringEncoder(symbol)
+		Key:   sarama.StringEncoder(symbol),
 		Value: sarama.ByteEncoder(msgValue),
 	}
 

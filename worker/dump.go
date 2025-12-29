@@ -32,7 +32,7 @@ func dumpTradeInternal(raw []byte) {
 		sideToString(t),
 		t.GetPrice(),
 		t.GetSize(),
-		received.UTC().Format(time.RFC3339Nano)
+		received.UTC().Format(time.RFC3339Nano),
 	)
 }
 
