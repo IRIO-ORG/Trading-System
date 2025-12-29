@@ -64,7 +64,7 @@ func main() {
 	slog.Info("Listening for gRPCs", "address", lis.Addr())
 
 	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(common.LoggingInterceptor))
-	afeServer := makeAfeServer(RequestsTopic, producer)
+	afeServer := makeAfeServer(tradesTopic, producer)
 	pb.RegisterApplicationFrontendServer(grpcServer, afeServer)
 	if err := grpcServer.Serve(lis); err != nil {
 		slog.Error("Failed to serve gRPC", "error", err)

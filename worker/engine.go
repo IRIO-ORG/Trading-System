@@ -23,7 +23,7 @@ type engine struct {
 
 func newEngine() *engine {
 	return &engine{
-		books: map[string]*orderBook{}
+		books: map[string]*orderBook{},
 	}
 }
 
