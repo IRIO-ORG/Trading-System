@@ -52,7 +52,7 @@ helm install my-kafka bitnami/kafka \
 ### Deploy to kubernetes
 
 ```
-kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/
 ```
 
 ### Check if it works
