@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: afe-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: afe
+  template:
+    metadata:
+      labels:
+        app: afe
+    spec:
+      containers:
+        - name: afe
+          image: ghcr.io/irio-org/trading-system/afe:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: trading-system-config
+          env:
+            # Important: this must match the port number in the `containerPort` field below
+            - name: SERVER_PORT
+              value: "50051"
+          ports:
+            # Important: this must match the port number in the `SERVER_PORT` environment variable
+            # Used for service deployment
+            - name: grpc-port
+              containerPort: 50051

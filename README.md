@@ -6,12 +6,12 @@ The course is realised in collaboration with Google and one of the employees was
 Authors: Tomasz Głąb, Hubert Krupniewski. Piotr Wieczorek
 
 
-## How to run on GCP:
+## How to run on GCP
 
 In order to run the project on GCP with basic cluster setup, follow these steps:
 
 ### Create cluster
-```
+```sh
 gcloud container clusters create trading-cluster \
 --zone europe-central2-a \
 --num-nodes 1 \
@@ -20,12 +20,12 @@ gcloud container clusters create trading-cluster \
 
 ### Get credentials
 
-```
+```sh
 gcloud container clusters get-credentials trading-cluster --zone europe-central2-a
 ```
 
 ### Add kafka repository to helm
-```
+```sh
 # Add bitnami repository
 helm repo add bitnami https://charts.bitnami.com/bitnami
 
@@ -37,7 +37,7 @@ helm repo update
 
 > **⚠️ Security Note:** The configuration below uses `PLAINTEXT` for communication. This is intended **strictly for development simplicity**. In a production environment, you must disable plaintext listeners and enforce encryption (TLS/SSL) and authentication (SASL/mTLS).
 
-```bash
+```sh
 helm install my-kafka bitnami/kafka \
   --set kraft.enabled=true \
   --set zookeeper.enabled=false \
@@ -51,20 +51,20 @@ helm install my-kafka bitnami/kafka \
 
 ### Deploy to kubernetes
 
-```
-kubectl apply -f k8s/deployment.yaml
+```sh
+kubectl apply -f k8s/
 ```
 
 ### Check if it works
 
-```
+```sh
 kubectl logs -l app=worker
 ```
 
 ### Clean up
 **Remember to delete the cluster when you are done with it, to save the reosurces.**
 
-```
+```sh
 gcloud container clusters delete trading-cluster --zone europe-central2-a
 ```
 
@@ -81,6 +81,6 @@ bazel run @rules_go//go -- get -tool your_tool_repo.com/x/useful/tool
 ```
 
 To add a new external dependency from [Bazel Central Registry](https://registry.bazel.build/), add the dependency to `MODULE.bazel`:
-```
+```starlark
 bazel_dep(name = "my_library", version = "1.0.0")
 ```
