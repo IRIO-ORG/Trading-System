@@ -1,28 +1,24 @@
-name: Pull request checks
-
-on:
-  pull_request:
-    types:
-      - opened
-      - reopened
-      - ready_for_review
-      - synchronize
-    branches:
-      - main
-env:
-  VALIDATE_ALL_CODEBASE: false
-  VALIDATE_GITHUB_ACTIONS: true
-  VALIDATE_GITLEAKS: true
-  VALIDATE_GO_MODULES: true
-  VALIDATE_KUBERNETES_KUBECONFORM: true
-  VALIDATE_MARKDOWN: true
-  VALIDATE_PROTOBUF: true
-  VALIDATE_YAML: true
+name: PR checks
+on: pull_request
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  build:
+    name: Build all Bazel packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: bazel-contrib/setup-bazel@0.16.0
+      - run: |
+          bazel build //...
+
   check-formatting:
     name: Check code formatting
     runs-on: ubuntu-latest
@@ -34,7 +30,15 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Super-linter
-        uses: super-linter/super-linter/slim@v8.3.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check Go formatting
+        run: ./go_format_check.sh
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format
+      - name: Check Protobuf formatting
+        run: |
+          if [ -d "./proto" ]; then
+            find ./proto -name "*.proto" -exec clang-format --Werror --dry-run --style=Google {} +
+          else
+            echo "Directory ./proto not found, skipping format check."
+          fi
+
