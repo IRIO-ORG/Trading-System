@@ -20,5 +20,3 @@ message Trade {
   // Size in ones. Cannot be a fraction.
   uint64 size = 4;
 }
-
-

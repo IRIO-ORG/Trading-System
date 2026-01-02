@@ -39,7 +39,8 @@ message ExecutedTradeEvent {
 
 // Placeholder for snapshot of the order book at a specific point in time.
 message OrderBookSnapshot {
-//  google.protobuf.Timestamp created_at = ?;
+  // Timestamp when the snapshot was taken.
+  // Note: The field number can be changed when the rest is defined.
+  google.protobuf.Timestamp created_at = 1;
   // ...Further fields to represent the order book state TBD.
-
 }
