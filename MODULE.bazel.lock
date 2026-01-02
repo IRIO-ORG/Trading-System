@@ -311,7 +311,7 @@
     "@@rules_oci+//oci:extensions.bzl%oci": {
       "general": {
         "bzlTransitiveDigest": "yfxlJlrzSTIKqkgZX6fgHa+vaNnFNFjfbzz42Xvvsm8=",
-        "usagesDigest": "eR+0ymXOnpy2aK+emqwcElWadmvMCvJPHO1e6vH6Gb8=",
+        "usagesDigest": "xCd4wP2wL3kFFqL+m5C2iUQpZEwS63FqLqT++XW7QJY=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -329,6 +329,19 @@
               "bazel_tags": []
             }
           },
+          "distroless_base_linux_arm64": {
+            "repoRuleId": "@@rules_oci+//oci/private:pull.bzl%oci_pull",
+            "attributes": {
+              "www_authenticate_challenges": {},
+              "scheme": "https",
+              "registry": "gcr.io",
+              "repository": "distroless/base",
+              "identifier": "sha256:ccaef5ee2f1850270d453fdf700a5392534f8d1a8ca2acda391fbb6a06b81c86",
+              "platform": "linux/arm64",
+              "target_name": "distroless_base_linux_arm64",
+              "bazel_tags": []
+            }
+          },
           "distroless_base": {
             "repoRuleId": "@@rules_oci+//oci/private:pull.bzl%oci_alias",
             "attributes": {
@@ -339,7 +352,8 @@
               "repository": "distroless/base",
               "identifier": "sha256:ccaef5ee2f1850270d453fdf700a5392534f8d1a8ca2acda391fbb6a06b81c86",
               "platforms": {
-                "@@platforms//cpu:x86_64": "@distroless_base_linux_amd64"
+                "@@platforms//cpu:x86_64": "@distroless_base_linux_amd64",
+                "@@platforms//cpu:arm64": "@distroless_base_linux_arm64"
               },
               "bzlmod_repository": "distroless_base",
               "reproducible": true
@@ -462,7 +476,8 @@
         "moduleExtensionMetadata": {
           "explicitRootModuleDirectDeps": [
             "distroless_base",
-            "distroless_base_linux_amd64"
+            "distroless_base_linux_amd64",
+            "distroless_base_linux_arm64"
           ],
           "explicitRootModuleDirectDevDeps": [],
           "useAllRepos": "NO",
