@@ -25,15 +25,7 @@ func dumpTradeInternal(raw []byte) {
 		received = ti.ReceivedAt.AsTime()
 	}
 
-	fmt.Printf(
-	"DUMP: request_id=%s symbol=%s side=%s price=%d size=%d received_at=%s\n",
-		ti.RequestId,
-		symbol,
-		sideToString(t),
-		t.GetPrice(),
-		t.GetSize(),
-		received.UTC().Format(time.RFC3339Nano),
-	)
+	fmt.Printf("DUMP: %s\n", ti.String())
 }
 
 func sideToString(t *pb.Trade) string {

@@ -51,7 +51,6 @@ func (e *engine) onTrade(ti *pb.TradeInternal) ([]executed, error) {
 	ob.seq++
 	in := &order{
 		id:        ti.RequestId,
-		symbol:	   symbol,
 		price:     ti.Trade.Price,
 		remaining: ti.Trade.Size,
 		seq:       ob.seq,
@@ -59,10 +58,10 @@ func (e *engine) onTrade(ti *pb.TradeInternal) ([]executed, error) {
 
 	switch ti.Trade.Side {
 	case pb.Side_BUY:
-		in.side = sideBuy
+		in.side = pb.Side_BUY
 		return matchBuy(symbol, ob, in), nil
 	case pb.Side_SELL:
-		in.side = sideSell
+		in.side = pb.Side_SELL
 		return matchSell(symbol, ob, in), nil
 	default:
 		return nil, fmt.Errorf("unknown side: %v", ti.Trade.Side)

@@ -2,18 +2,13 @@ package main
 
 import (
 	"container/heap"
-)
 
-type side int
-
-const (
-	sideSell side = iota
-	sideBuy
+	pb "github.com/IRIO-ORG/Trading-System/proto"
 )
 
 type order struct {
 	id 			string
-	side 		side
+	side 		pb.Side
 	price 		uint64
 	remaining	uint64
 	seq			uint64
@@ -22,7 +17,7 @@ type order struct {
 type buyHeap []*order
 
 func (h buyHeap) Len() int { return len(h) }
-func (h buyHeap) Less(i int, j int) bool {
+func (h buyHeap) Less(i, j int) bool {
 	if h[i].price != h[j].price {
 		return h[i].price > h[j].price
 	}
