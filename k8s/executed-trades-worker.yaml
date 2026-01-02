@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: executed-trades-worker-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: executed-trades-worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/irio-org/trading-system/executed-trades:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: trading-system-config

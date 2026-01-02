@@ -35,3 +35,7 @@ jobs:
       - name: Push worker image to GHCR via Bazel
         run: |
           bazel run //worker:push -- --repository ghcr.io/${{ env.ORG }}/${{ env.IMAGE_PREFIX }}/worker
+
+      - name: Push executed trades worker image to GHCR via Bazel
+        run: |
+          bazel run //executed-trades:push -- --repository ghcr.io/${{ env.ORG }}/${{ env.IMAGE_PREFIX }}/executed-trades
