@@ -3,8 +3,6 @@ package trading_system;
 
 option go_package = "github.com/IRIO-ORG/Trading-System/proto";
 
-import "google/protobuf/timestamp.proto";
-
 enum Side {
   SELL = 0;
   BUY = 1;
@@ -23,9 +21,4 @@ message Trade {
   uint64 size = 4;
 }
 
-message TradeInternal {
-  // Trade details.
-  Trade trade = 1;
-  // Timestamp when this trade was received by AFE.
-  google.protobuf.Timestamp received_at = 2;
-}
+
