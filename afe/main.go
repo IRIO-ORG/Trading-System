@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-const RequestsTopic = "trading-updates"
+//const RequestsTopic = "trading-updates"
 
 func makeProducer() (sarama.SyncProducer, error) {
 	kafkaAddr := os.Getenv("KAFKA_BROKER_ADDR")
@@ -25,6 +25,8 @@ func makeProducer() (sarama.SyncProducer, error) {
 
 	config := sarama.NewConfig()
 	config.Producer.Return.Successes = true
+	config.Producer.RequiredAcks = sarama.WaitForAll
+	config.Producer.Retry.Max = 5
 
 	// Retry loop for connection (Kafka might take a moment to start)
 	var producer sarama.SyncProducer
@@ -52,6 +54,11 @@ func main() {
 	}
 	defer producer.Close()
 
+	tradesTopic := os.Getenv("TRADES_TOPIC")
+	if tradesTopic == "" {
+		tradesTopic = "trades"
+	}
+
 	port, err := common.GetEnv("SERVER_PORT", uint16(50051))
 	if err != nil {
 		slog.Error("Invalid AFE server port, using default", "error", err)
@@ -61,10 +68,10 @@ func main() {
 		slog.Error("Failed to listen", "error", err)
 		os.Exit(1)
 	}
-	slog.Info("Listening for gRPCs", "address", lis.Addr())
+	slog.Info("Listening for gRPCs", "address", lis.Addr(), "trades_topic", tradesTopic)
 
 	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(common.LoggingInterceptor))
-	afeServer := makeAfeServer(RequestsTopic, producer)
+	afeServer := makeAfeServer(tradesTopic, producer)
 	pb.RegisterApplicationFrontendServer(grpcServer, afeServer)
 	if err := grpcServer.Serve(lis); err != nil {
 		slog.Error("Failed to serve gRPC", "error", err)

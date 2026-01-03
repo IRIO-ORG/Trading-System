@@ -39,8 +39,18 @@ go_binary(
 
 go_library(
     name = "worker_lib",
-    srcs = ["main.go"],
+    srcs = [
+        "main.go",
+        "kafka.go",
+        "dump.go",
+        "engine.go",
+        "orderbook.go"
+    ],
     importpath = "github.com/IRIO-ORG/Trading-System/worker",
     visibility = ["//visibility:private"],
-    deps = ["@com_github_ibm_sarama//:sarama"],
+    deps = [
+        "//proto",
+        "@com_github_ibm_sarama//:sarama",
+        "@org_golang_google_protobuf//proto"
+        ],
 )
