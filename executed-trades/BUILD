@@ -41,8 +41,8 @@ go_library(
     visibility = ["//visibility:private"],
     deps = [
         "//common/kafka",
+        "//proto",
         "@com_github_ibm_sarama//:sarama",
         "@org_golang_google_protobuf//proto",
-        "//proto"
     ],
 )

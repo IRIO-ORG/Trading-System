@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 
 	"github.com/IBM/sarama"
 	"google.golang.org/protobuf/proto"
@@ -17,12 +17,15 @@ const (
 )
 
 func main() {
-	log.Println("Starting Executed Trades Consumer...")
+	slog.Info("Starting Executed Trades Consumer...")
 
 	handler := &ExecutedTradesHandler{}
 
 	// Blocks main() operation until receives CTRL+C/SIGTERM
-	kafka.RunConsumerGroup(groupID, []string{topic}, handler)
+	err := kafka.RunConsumerGroup(groupID, []string{topic}, handler)
+	if err != nil {
+		slog.Error("ERROR running consumer group: %v", err)
+	}
 }
 
 // TODO: move to internal package
@@ -35,12 +38,12 @@ func (h *ExecutedTradesHandler) ConsumeClaim(session sarama.ConsumerGroupSession
 	for msg := range claim.Messages() {
 		trade := &pb.ExecutedTradeEvent{}
 		if err := proto.Unmarshal(msg.Value, trade); err != nil {
-			log.Printf("ERROR unmarshalling: %v", err)
+			slog.Error("ERROR unmarshalling the message value {%v}: %v", msg.Value, err)
 			session.MarkMessage(msg, "")
 			continue
 		}
 
-		log.Printf(">>> EXECUTED TRADE: %s | Price: %d | Size: %d", trade.Symbol, trade.Price, trade.Size)
+		slog.Info(">>> EXECUTED TRADE: %s | Price: %d | Size: %d", trade.Symbol, trade.Price, trade.Size)
 		session.MarkMessage(msg, "")
 	}
 	return nil

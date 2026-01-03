@@ -4,7 +4,7 @@ metadata:
   name: trading-system-config
 data:
   # Multiple brokers can be comma separated.
-  # By setting up Kafka with helm, a kubernetes service is created, which loads balances
+  # By setting up Kafka with helm, a kubernetes service is created, which load balances
   # between the Kafka pods. BUT if one of the kafka pods is down, the service may direct
   # traffic to the pod which is down (and hasn't been yet removed) - a retry may be needed.
   # Currently, producers and consumers perform retries on connection failures,
