@@ -22,7 +22,7 @@ oci_push(
 oci_load(
     name = "load",
     image = ":afe_image",
-    repo_tags = ["irio_afe:latest"],
+    repo_tags = ["ghcr.io/irio-org/trading-system/afe:latest"],
 )
 
 pkg_tar(
