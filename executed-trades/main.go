@@ -40,8 +40,8 @@ func (h *ExecutedTradesHandler) ConsumeClaim(session sarama.ConsumerGroupSession
 		if err := proto.Unmarshal(msg.Value, trade); err != nil {
 			slog.Error(
 				"Error unmarshalling message value",
-				"value", msg.Value,
 				"error", err,
+				"value", msg.Value,
 			)
 			session.MarkMessage(msg, "")
 			continue

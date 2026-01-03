@@ -1,63 +1,102 @@
 package main
 
 import (
-	"fmt"
-	"log"
+	"log/slog"
 	"os"
-	"os/signal"
-	"time"
 
 	"github.com/IBM/sarama"
+	"google.golang.org/protobuf/proto"
+
+	"github.com/IRIO-ORG/Trading-System/common/kafka"
+	pb "github.com/IRIO-ORG/Trading-System/proto"
+)
+
+// TODO remove once config map kafka is setup
+const (
+	requestTopic        = "trade-requests"
+	executedTradesTopic = "executed-trades"
+	consumerGroupID     = "worker-group"
 )
 
 func main() {
-	kafkaAddr := os.Getenv("KAFKA_BROKER_ADDR")
-	if kafkaAddr == "" {
-		kafkaAddr = "my-kafka:9092"
-	}
-	topic := "trading-updates"
+	slog.Info("Starting Trades topic worker...")
 
-	fmt.Printf("WORKER: Connecting to Kafka at %s...\n", kafkaAddr)
-
-	config := sarama.NewConfig()
-	config.Consumer.Return.Errors = true
-
-	// Retry loop
-	var consumer sarama.Consumer
-	var err error
-	for i := 0; i < 10; i++ {
-		consumer, err = sarama.NewConsumer([]string{kafkaAddr}, config)
-		if err == nil {
-			break
-		}
-		fmt.Printf("WORKER: Waiting for Kafka... (%v)\n", err)
-		time.Sleep(5 * time.Second)
-	}
+	executedTradesProducer, err := kafka.NewProtoProducer()
 	if err != nil {
-		log.Fatalf("WORKER: Failed to start consumer: %v", err)
+		slog.Error("Critical error creating producer", "error", err)
+		os.Exit(1)
 	}
-	defer consumer.Close()
-
-	partitionConsumer, err := consumer.ConsumePartition(topic, 0, sarama.OffsetNewest)
-	if err != nil {
-		log.Fatalf("WORKER: Failed to create partition consumer: %v", err)
-	}
-	defer partitionConsumer.Close()
-
-	fmt.Println("WORKER: Connected! Listening for messages...")
-
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, os.Interrupt)
-
-	for {
-		select {
-		case msg := <-partitionConsumer.Messages():
-			fmt.Printf("WORKER received: %s\n", string(msg.Value))
-		case err := <-partitionConsumer.Errors():
-			log.Printf("WORKER error: %v\n", err)
-		case <-signals:
-			fmt.Println("WORKER: Interrupt is detected")
-			return
+	defer func() {
+		if err := executedTradesProducer.Close(); err != nil {
+			slog.Error("Error closing producer", "error", err)
 		}
+	}()
+
+	handler := &WorkerHandler{
+		producer: executedTradesProducer,
 	}
+
+	err = kafka.RunConsumerGroup(consumerGroupID, []string{requestTopic}, handler)
+	if err != nil {
+		slog.Error("ERROR running consumer group", "error", err)
+	}
+}
+
+// TODO once MVP is done, move to internal package
+type WorkerHandler struct {
+	producer *kafka.ProtoProducer
+}
+
+func (h *WorkerHandler) Setup(_ sarama.ConsumerGroupSession) error   { return nil }
+func (h *WorkerHandler) Cleanup(_ sarama.ConsumerGroupSession) error { return nil }
+
+func (h *WorkerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
+	for msg := range claim.Messages() {
+		req := &pb.TradeEvent{}
+		if err := proto.Unmarshal(msg.Value, req); err != nil {
+			slog.Error("Failed to unmarshal trade request",
+				"error", err,
+				"value", msg.Value,
+			)
+			session.MarkMessage(msg, "")
+			continue
+		}
+
+		slog.Info("Processing Order",
+			"requestId", req.RequestId,
+			"symbol", req.Trade.Instrument.Symbol,
+			"side", req.Trade.Side,
+			"price", req.Trade.Price,
+			"size", req.Trade.Size,
+		)
+
+		//TODO business logic
+		// TODO mieć na uwadze fail przy wysyłaniu i restart processingu linia 93
+		executedTrade := &pb.ExecutedTradeEvent{
+			Symbol:       "Placeholder",
+			Price:        1,
+			Size:         1,
+			ExecutionId:  "placeholder",
+			BidRequestId: "placeholder",
+			AskRequestId: "placeholder",
+		}
+
+		err := h.producer.Send(executedTradesTopic, "", executedTrade)
+		if err != nil {
+			slog.Error("Failed to send executed trade",
+				"error", err,
+				"executed-trade", executedTrade,
+			)
+			// Mark message does not happen, and we return the error, thus the message will be reprocessed
+			// because the consumer will not commit the offset and will receive the message again after
+			// restart in the consumer_runner.go loop
+			return err
+		}
+
+		// Do usunięcia po zrozumieniu: oznaczenie wiadomości jako przetworzonej
+		// to zachowuje się w pamięci ram workera i co jakiś czas (domyślnie 1s) worker
+		// aktualizuje kafce, że ta wiadomość została skonsumowana
+		session.MarkMessage(msg, "")
+	}
+	return nil
 }
