@@ -16,7 +16,7 @@ import (
 // including connection, rebalancing loops, error draining, and graceful shutdown.
 // Blocks until the ctrl+c signal is received  or the program is terminated.
 func RunConsumerGroup(groupID string, topics []string, handler sarama.ConsumerGroupHandler) error {
-	slog.Info("Initializing Consumer Group: %s for topics: %v", groupID, topics)
+	slog.Info("Initializing Consumer Group for topics", "groupID", groupID, "topics", topics)
 
 	consumerGroup, err := NewConsumerGroup(groupID)
 	if err != nil {
