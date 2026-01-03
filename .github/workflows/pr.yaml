@@ -16,8 +16,15 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: bazel-contrib/setup-bazel@0.16.0
+      - name: Prepare credentials to GCP Bazel Cache Bucket
+        uses: 'google-github-actions/auth@v3'
+        with:
+          credentials_json: '${{ secrets.GCP_BAZEL_CACHE_KEY }}'
       - run: |
-          bazel build //...
+          bazel build //... \
+            --remote_cache=https://storage.googleapis.com/irio-gh-actions-cache \
+            --google_default_credentials \
+            --remote_download_toplevel
 
   check-formatting:
     name: Check code formatting
