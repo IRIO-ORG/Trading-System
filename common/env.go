@@ -18,6 +18,8 @@ func GetEnv[T any](key string, defaultValue T) (T, error) {
 	switch any(defaultValue).(type) {
 	case string:
 		return any(v).(T), nil
+	case uint16:
+		parsed, err = strconv.ParseUint(v, 10, 16)
 	case int:
 		parsed, err = strconv.Atoi(v)
 	default:
