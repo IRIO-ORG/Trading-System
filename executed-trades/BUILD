@@ -39,5 +39,10 @@ go_library(
     srcs = ["main.go"],
     importpath = "github.com/IRIO-ORG/Trading-System/executed-trades",
     visibility = ["//visibility:private"],
-    deps = ["@com_github_ibm_sarama//:sarama"],
+    deps = [
+        "//common/kafka",
+        "@com_github_ibm_sarama//:sarama",
+        "@org_golang_google_protobuf//proto",
+        "//proto"
+    ],
 )

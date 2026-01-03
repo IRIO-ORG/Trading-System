@@ -2,7 +2,10 @@ load("@rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "kafka",
-    srcs = ["factory.go"],
+    srcs = [
+        "factory.go",
+        "consumer_runner.go",
+        ],
     importpath = "github.com/IRIO-ORG/Trading-System/common/kafka",
     visibility = ["//visibility:public"],
     deps = [
