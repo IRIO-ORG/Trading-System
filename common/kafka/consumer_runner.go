@@ -24,14 +24,14 @@ func RunConsumerGroup(groupID string, topics []string, handler sarama.ConsumerGr
 	}
 	defer func() {
 		if err := consumerGroup.Close(); err != nil {
-			slog.Error("Error closing consumer group: %v", err)
+			slog.Error("Error closing consumer group", "error", err)
 		}
 	}()
 
 	// Drain the Errors channel to prevent deadlocks (required when config...Return.Errors = true).
 	go func() {
 		for err := range consumerGroup.Errors() {
-			slog.Error("Background consumer error: %v", err)
+			slog.Error("Background consumer error", "error", err)
 		}
 	}()
 
@@ -48,7 +48,7 @@ func RunConsumerGroup(groupID string, topics []string, handler sarama.ConsumerGr
 			// Consume blocks until the session is terminated (e.g., by a rebalance).
 			// The loop ensures the consumer automatically rejoins the group.
 			if err := consumerGroup.Consume(ctx, topics, handler); err != nil {
-				slog.Error("Error from consumer: %v", err)
+				slog.Error("Error from consumer", "error", err)
 			}
 
 			if ctx.Err() != nil {
