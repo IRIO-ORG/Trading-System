@@ -1,0 +1,15 @@
+apiVersion: skaffold/v4beta13
+kind: Config
+metadata:
+  name: irio
+build:
+  artifacts:
+    - image: ghcr.io/irio-org/trading-system/afe
+      bazel:
+        target: //afe:afe_tarball
+manifests:
+  rawYaml:
+    - k8s/afe-service.yaml
+    - k8s/afe.yaml
+    - k8s/config.yaml
+    - k8s/worker.yaml
