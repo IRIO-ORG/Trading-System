@@ -26,12 +26,12 @@ func makeAfeServer(requestsTopic string, producer sarama.SyncProducer) pb.Applic
 }
 
 func (s *afeServer) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.TradeResponse, error) {
-	msgValue, err := proto.Marshal(&pb.TradeInternal{
+	msgValue, err := proto.Marshal(&pb.TradeEvent{
 		Trade:      req.GetTrade(),
 		ReceivedAt: timestamppb.New(time.Now()),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Failed to Marshal to TradeInternal: [%v]", err)
+		return nil, fmt.Errorf("Failed to Marshal to TradeEvent: [%v]", err)
 	}
 	msg := &sarama.ProducerMessage{
 		Topic: s.requestsTopic,

@@ -1,0 +1,46 @@
+syntax = "proto3";
+package trading_system;
+
+option go_package = "github.com/IRIO-ORG/Trading-System/proto";
+
+import "google/protobuf/timestamp.proto";
+
+import "proto/market_data.proto";
+
+// Event representing a trade received by the Application Frontend (AFE).
+message TradeEvent {
+  // Trade details.
+  Trade trade = 1;
+  // Timestamp when this trade was received by AFE.
+  google.protobuf.Timestamp received_at = 2;
+  // Unique identifier for the trade request.
+  string request_id = 3;
+}
+
+// Event representing an executed trade in the system.
+message ExecutedTradeEvent {
+  // Symbol of the traded instrument.
+  string symbol = 1;
+  // Price in 10^-6 units, e.g. 1230000 = 1.23$.
+  uint64 price = 2;
+  // Units traded.
+  uint64 size = 3;
+
+  // ID of the bid request that led to this execution.
+  string bid_request_id = 4;
+  // ID of the ask request that led to this execution.
+  string ask_request_id = 5;
+
+  // Timestamp when the trade was executed.
+  google.protobuf.Timestamp executed_at = 6;
+  // Unique trade execution identifier.
+  string execution_id = 7;
+}
+
+// Placeholder for snapshot of the order book at a specific point in time.
+message OrderBookSnapshot {
+  // Timestamp when the snapshot was taken.
+  // Note: The field number can be changed when the rest is defined.
+  google.protobuf.Timestamp created_at = 1;
+  // ...Further fields to represent the order book state TBD.
+}

@@ -5,15 +5,21 @@ load("@rules_go//proto:def.bzl", "go_proto_library")
 proto_library(
     name = "market_data",
     srcs = ["market_data.proto"],
-    deps = [
-        "@protobuf//:timestamp_proto",
-    ],
 )
 
 proto_library(
     name = "afe",
     srcs = ["afe.proto"],
     deps = [":market_data"],
+)
+
+proto_library(
+    name = "events",
+    srcs = ["events.proto"],
+    deps = [
+        "@protobuf//:timestamp_proto",
+        ":market_data",
+    ],
 )
 
 go_proto_library(
@@ -25,6 +31,7 @@ go_proto_library(
     protos = [
         ":afe",
         ":market_data",
+        ":events"
     ],
     visibility = ["//visibility:public"],
     deps = [
