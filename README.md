@@ -41,7 +41,8 @@ helm repo update
 helm install my-kafka bitnami/kafka \
   --set kraft.enabled=true \
   --set zookeeper.enabled=false \
-  --set controller.replicaCount=1 \
+  --set replicaCount=3 \
+  --set controller.replicaCount=3 \ # Controllers (Raft quorum)
   --set listeners.client.protocol=PLAINTEXT \
   --set listeners.interbroker.protocol=PLAINTEXT \
   --set allowPlaintextListener=true \
