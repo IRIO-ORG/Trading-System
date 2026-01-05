@@ -20,7 +20,7 @@ func main() {
 	}
 	defer producer.Close()
 
-	tradesTopic, _ := common.GetEnv("TRADES_TOPIC", "trades")
+	tradesTopic, _ := common.GetEnv("TRADES_TOPIC", "trade-requests")
 
 	port, err := common.GetEnv("SERVER_PORT", uint16(50051))
 	if err != nil {
