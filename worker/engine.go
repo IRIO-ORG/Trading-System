@@ -27,19 +27,19 @@ func newEngine() *engine {
 	}
 }
 
-func (e *engine) onTrade(ti *pb.TradeInternal) ([]executed, error) {
-	if ti == nil || ti.Trade == nil || ti.Trade.Instrument == nil {
-		return nil, fmt.Errorf("invalid TradeInternal: missing trade.instrument")
+func (e *engine) onTrade(ev *pb.TradeEvent) ([]executed, error) {
+	if ev == nil || ev.Trade == nil || ev.Trade.Instrument == nil {
+		return nil, fmt.Errorf("invalid TradeEvent: missing trade.instrument")
 	}
-	symbol := ti.Trade.Instrument.Symbol
+	symbol := ev.Trade.Instrument.Symbol
 	if symbol == "" {
-		return nil, fmt.Errorf("invalid TradeInternal: empty symbol")
+		return nil, fmt.Errorf("invalid TradeEvent: empty symbol")
 	}
-	if ti.Trade.Price == 0 || ti.Trade.Size == 0 {
-		return nil, fmt.Errorf("invalid TradeInternal: price/size must be > 0")
+	if ev.Trade.Price == 0 || ev.Trade.Size == 0 {
+		return nil, fmt.Errorf("invalid TradeEvent: price/size must be > 0")
 	}
-	if ti.RequestId == "" {
-		return nil, fmt.Errorf("invalid TradeInternal: missing request_id")
+	if ev.RequestId == "" {
+		return nil, fmt.Errorf("invalid TradeEvent: missing request_id")
 	}
 
 	ob := e.books[symbol]
@@ -50,13 +50,13 @@ func (e *engine) onTrade(ti *pb.TradeInternal) ([]executed, error) {
 
 	ob.seq++
 	in := &order{
-		id:        ti.RequestId,
-		price:     ti.Trade.Price,
-		remaining: ti.Trade.Size,
+		id:        ev.RequestId,
+		price:     ev.Trade.Price,
+		remaining: ev.Trade.Size,
 		seq:       ob.seq,
 	}
 
-	switch ti.Trade.Side {
+	switch ev.Trade.Side {
 	case pb.Side_BUY:
 		in.side = pb.Side_BUY
 		return matchBuy(symbol, ob, in), nil
@@ -64,7 +64,7 @@ func (e *engine) onTrade(ti *pb.TradeInternal) ([]executed, error) {
 		in.side = pb.Side_SELL
 		return matchSell(symbol, ob, in), nil
 	default:
-		return nil, fmt.Errorf("unknown side: %v", ti.Trade.Side)
+		return nil, fmt.Errorf("unknown side: %v", ev.Trade.Side)
 	}
 }
 
@@ -89,7 +89,6 @@ func matchBuy(symbol string, ob *orderBook, in *order) []executed {
 			buyID:    in.id,
 			sellID:   bestAsk.id,
 			execTime: time.Now().UTC(),
-			// already concat id?
 		})
 
 		in.remaining -= qty
@@ -127,7 +126,6 @@ func matchSell(symbol string, ob *orderBook, in *order) []executed {
 			buyID:    bestBid.id,
 			sellID:   in.id,
 			execTime: time.Now().UTC(),
-			// same
 		})
 
 		in.remaining -= qty
