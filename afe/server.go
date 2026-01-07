@@ -15,22 +15,16 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-)
-
-const (
-	errMissingInstrument = "missing trade.instrument"
-	errMissingSymbol 	 = "instrument.symbol is required"
-	errInvalidSize 		 = "size must be > 0"
-	errInvalidPrice 	 = "price must be > 0"
+	ckafka "github.com/IRIO-ORG/Trading-System/common/kafka"
 )
 
 type afeServer struct {
 	pb.UnimplementedApplicationFrontendServer
-	producer      sarama.SyncProducer
+	producer      *ckafka.ProtoProducer
 	requestsTopic string
 }
 
-func makeAfeServer(requestsTopic string, producer sarama.SyncProducer) pb.ApplicationFrontendServer {
+func makeAfeServer(requestsTopic string, producer *ckafka.ProtoProducer) pb.ApplicationFrontendServer {
 	return &afeServer{
 		requestsTopic: requestsTopic,
 		producer:      producer,
@@ -39,25 +33,21 @@ func makeAfeServer(requestsTopic string, producer sarama.SyncProducer) pb.Applic
 
 func validateTradeRequest(req *pb.TradeRequest) (symbol string, requestID string, err error) {
 	if req == nil || req.Trade == nil || req.Trade.Instrument == nil {
-		return "", "", status.Error(codes.InvalidArgument, errMissingInstrument)
+		return "", "", status.Error(codes.InvalidArgument, "missing trade.instrument")
 	}
 
 	symbol = strings.ToUpper(strings.TrimSpace(req.Trade.Instrument.Symbol))
 	if symbol == "" {
-		return "", "", status.Error(codes.InvalidArgument, errMissingSymbol)
+		return "", "", status.Error(codes.InvalidArgument, "instrument.symbol is required")
 	}
 	if req.Trade.Size == 0 {
-		return "", "", status.Error(codes.InvalidArgument, errInvalidSize)
+		return "", "", status.Error(codes.InvalidArgument, "size must be > 0")
 	}
 	if req.Trade.Price == 0 {
-		return "", "", status.Error(codes.InvalidArgument, errInvalidPrice)
+		return "", "", status.Error(codes.InvalidArgument, "price must be > 0")
 	}
 
-	requestID = strings.TrimSpace(req.RequestId)
-	if requestID == "" {
-		requestID = newRequestID()
-	}
-
+	requestID = newRequestID()
 	req.Trade.Instrument.Symbol = symbol
 	return symbol, requestID, nil
 }

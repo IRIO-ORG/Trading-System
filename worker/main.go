@@ -25,20 +25,32 @@ const (
 	defaultWorkerMode 		= "engine"
 )
 
+type TopicProducer struct {
+	topic 	  string
+	producer *kafka.ProtoProducer
+}
+
+func NewTopicProducer(topic string, producer *kafka.ProtoProducer) *TopicProducer {
+	return &TopicProducer{topic: topic, producer: producer}
+}
+
+func (tp *TopicProducer) TPSend(key string, msg proto.Message) error {
+	return tp.producer.Send(tp.topic, key, msg)
+}
+
 // TODO once MVP is done, move to internal package
 type WorkerHandler struct {
-	mode 			string
-	executedTopic	string // could be global?
-	producer 		*kafka.ProtoProducer
+	mode 	  string
+	producer *TopicProducer
 }
 
 func main() {
 	requestsTopic, _ := common.GetEnv("REQUESTS_TOPIC", defaultRequestsTopic)
 	executedTopic, _ := common.GetEnv("EXECUTED_TRADES_TOPIC", defaultExecutedTopic)
-	groupID, _ := common.GetEnv("WORKER_GROUP_ID", defaultWorkerGroupID)
+	groupID, _ := common.GetEnv("WORKER_GROUP_ID", defaultConsumerGroupID)
 	mode, _ := common.GetEnv("WORKER_MODE", defaultWorkerMode)
 
-	slog.Info("Starting Trades topic worker...", "mode", mode)
+	slog.Info("WORKER: Starting Trades topic worker...", "mode", mode)
 
 	if mode != "engine" && mode != "dump" {
 		slog.Warn("WORKER: Unknown mode")
@@ -53,19 +65,18 @@ func main() {
 	}
 	defer func() {
 		if err := executedTradesProducer.Close(); err != nil {
-			slog.Error("Error closing producer", "error", err)
+			slog.Error("WORKER: Error closing producer", "error", err)
 		}
 	}()
 
 	handler := &WorkerHandler{
-		mode: mode,
-		executedTopic: executedTopic,
-		producer: executedTradesProducer,
+		mode:     mode,
+		producer: NewTopicProducer(executedTopic, executedTradesProducer),
 	}
 
 	err = kafka.RunConsumerGroup(groupID, []string{requestsTopic}, handler)
 	if err != nil {
-		slog.Error("ERROR running consumer group", "error", err)
+		slog.Error("WORKER: error running consumer group", "error", err)
 		os.Exit(1)
 	}
 }
@@ -90,7 +101,7 @@ func (h *WorkerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim 
 
 		req := &pb.TradeEvent{}
 		if err := proto.Unmarshal(msg.Value, req); err != nil {
-			slog.Error("Failed to unmarshal trade request",
+			slog.Error("WORKER: Failed to unmarshal trade request",
 				"error", err,
 				"value", msg.Value,
 			)
@@ -143,7 +154,7 @@ func (h *WorkerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim 
 				AskRequestId: ex.sellID,
 				ExecutedAt:	  timestamppb.New(ex.execTime),
 			}
-			if err := h.producer.Send(h.executedTopic, ex.symbol, executedTrade); err != nil {
+			if err := h.producer.TPSend(ex.symbol, executedTrade); err != nil {
 				slog.Error("WORKER: failed to send executed trade",
 					"error", err,
 					"executed-trade", executedTrade,
@@ -154,9 +165,6 @@ func (h *WorkerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim 
 			slog.Info("WORKER: executed", "executed-trade", executedTrade.String())
 		}
 
-		// Do usunięcia po zrozumieniu: oznaczenie wiadomości jako przetworzonej
-		// to zachowuje się w pamięci ram workera i co jakiś czas (domyślnie 1s) worker
-		// aktualizuje kafce, że ta wiadomość została skonsumowana
 		session.MarkMessage(msg, "")
 	}
 	return nil

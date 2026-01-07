@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log/slog"
 
 	pb "github.com/IRIO-ORG/Trading-System/proto"
 	"google.golang.org/protobuf/proto"
@@ -10,7 +10,7 @@ import (
 func dumpTradeEvent(raw []byte) {
 	var ti pb.TradeEvent
 	if err := proto.Unmarshal(raw, &ti); err != nil {
-		fmt.Printf("DUMP: failed to decode TradeEvent: %v\n", err)
+		slog.Error("DUMP: failed to decode TradeEvent", "err", err)
 		return
 	}
 

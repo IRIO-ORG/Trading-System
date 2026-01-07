@@ -12,6 +12,10 @@ import (
 	"google.golang.org/grpc"
 )
 
+const (
+	defaultRequestsTopic   	= "trade-requests"
+)
+
 func main() {
 	producer, err := kafka.NewProducer()
 	if err != nil {
@@ -20,7 +24,7 @@ func main() {
 	}
 	defer producer.Close()
 
-	tradesTopic, _ := common.GetEnv("TRADES_TOPIC", "trade-requests")
+	tradesTopic, _ := common.GetEnv("TRADES_TOPIC", defaultRequestsTopic)
 
 	port, err := common.GetEnv("SERVER_PORT", uint16(50051))
 	if err != nil {
