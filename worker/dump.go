@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log/slog"
 
 	pb "github.com/IRIO-ORG/Trading-System/proto"

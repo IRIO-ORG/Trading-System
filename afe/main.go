@@ -17,7 +17,7 @@ const (
 )
 
 func main() {
-	producer, err := kafka.NewProducer()
+	producer, err := kafka.NewProtoProducer()
 	if err != nil {
 		slog.Error("NewProducer failed", "error", err)
 		os.Exit(1)
