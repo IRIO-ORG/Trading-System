@@ -7,11 +7,11 @@ import (
 )
 
 type order struct {
-	id 			string
-	side 		pb.Side
-	price 		uint64
-	remaining	uint64
-	seq			uint64
+	id        string
+	side      pb.Side
+	price     uint64
+	remaining uint64
+	seq       uint64
 }
 
 type buyHeap []*order
@@ -24,7 +24,7 @@ func (h buyHeap) Less(i, j int) bool {
 	return h[i].seq < h[j].seq
 }
 func (h buyHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
-func (h *buyHeap) Push(x any) { *h = append(*h, x.(*order)) }
+func (h *buyHeap) Push(x any)   { *h = append(*h, x.(*order)) }
 func (h *buyHeap) Pop() any {
 	old := *h
 	n := len(old)
@@ -49,7 +49,7 @@ func (h sellHeap) Less(i, j int) bool {
 	return h[i].seq < h[j].seq
 }
 func (h sellHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
-func (h *sellHeap) Push(x any) { *h = append(*h, x.(*order)) }
+func (h *sellHeap) Push(x any)   { *h = append(*h, x.(*order)) }
 func (h *sellHeap) Pop() any {
 	old := *h
 	n := len(old)
@@ -64,11 +64,10 @@ func (h sellHeap) Peek() *order {
 	return h[0]
 }
 
-
 type orderBook struct {
-	bids 	buyHeap
-	asks 	sellHeap
-	seq		uint64
+	bids buyHeap
+	asks sellHeap
+	seq  uint64
 }
 
 func newOrderBook() *orderBook {

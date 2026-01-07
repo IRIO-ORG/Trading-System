@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	defaultRequestsTopic   	= "trade-requests"
+	defaultRequestsTopic = "trade-requests"
 )
 
 func main() {

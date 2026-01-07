@@ -9,12 +9,12 @@ import (
 )
 
 type executed struct {
-	symbol 		string
-	price 		uint64
-	size 		uint64
-	buyID		string
-	sellID		string
-	execTime	time.Time
+	symbol   string
+	price    uint64
+	size     uint64
+	buyID    string
+	sellID   string
+	execTime time.Time
 }
 
 type engine struct {
@@ -76,7 +76,7 @@ func matchBuy(symbol string, ob *orderBook, in *order) []executed {
 		if bestAsk == nil {
 			break
 		}
-		
+
 		if bestAsk.price > in.price {
 			break
 		}

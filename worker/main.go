@@ -1,11 +1,11 @@
 package main
 
 import (
-	"log/slog"
-	"os"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
+	"os"
 	"time"
 
 	"github.com/IBM/sarama"
@@ -19,14 +19,14 @@ import (
 
 // TODO remove once config map kafka is setup
 const (
-	defaultRequestsTopic   	= "trade-requests"
-	defaultExecutedTopic 	= "executed-trades"
-	defaultConsumerGroupID 	= "worker-group"
-	defaultWorkerMode 		= "engine"
+	defaultRequestsTopic   = "trade-requests"
+	defaultExecutedTopic   = "executed-trades"
+	defaultConsumerGroupID = "worker-group"
+	defaultWorkerMode      = "engine"
 )
 
 type TopicProducer struct {
-	topic 	  string
+	topic    string
 	producer *kafka.ProtoProducer
 }
 
@@ -40,7 +40,7 @@ func (tp *TopicProducer) TPSend(key string, msg proto.Message) error {
 
 // TODO once MVP is done, move to internal package
 type WorkerHandler struct {
-	mode 	  string
+	mode     string
 	producer *TopicProducer
 }
 
@@ -56,7 +56,6 @@ func main() {
 		slog.Warn("WORKER: Unknown mode")
 		mode = defaultWorkerMode
 	}
-
 
 	executedTradesProducer, err := kafka.NewProtoProducer()
 	if err != nil {
@@ -152,7 +151,7 @@ func (h *WorkerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim 
 				ExecutionId:  newExecutedID(),
 				BidRequestId: ex.buyID,
 				AskRequestId: ex.sellID,
-				ExecutedAt:	  timestamppb.New(ex.execTime),
+				ExecutedAt:   timestamppb.New(ex.execTime),
 			}
 			if err := h.producer.TPSend(ex.symbol, executedTrade); err != nil {
 				slog.Error("WORKER: failed to send executed trade",

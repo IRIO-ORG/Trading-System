@@ -2,18 +2,18 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
-	"time"
-	"crypto/rand"
 	"strings"
-	"encoding/hex"
+	"time"
 
+	ckafka "github.com/IRIO-ORG/Trading-System/common/kafka"
 	pb "github.com/IRIO-ORG/Trading-System/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	ckafka "github.com/IRIO-ORG/Trading-System/common/kafka"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type afeServer struct {
@@ -56,10 +56,10 @@ func (s *afeServer) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.
 		return nil, err
 	}
 
-	ev := &pb.TradeEvent {
+	ev := &pb.TradeEvent{
 		Trade:      req.GetTrade(),
 		ReceivedAt: timestamppb.Now(),
-		RequestId: 	requestID,
+		RequestId:  requestID,
 	}
 
 	if err := s.producer.Send(s.requestsTopic, symbol, ev); err != nil {
