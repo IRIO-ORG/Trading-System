@@ -9,9 +9,7 @@ import (
 	"strings"
 	"encoding/hex"
 
-	"github.com/IBM/sarama"
 	pb "github.com/IRIO-ORG/Trading-System/proto"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -58,25 +56,15 @@ func (s *afeServer) SubmitTrade(ctx context.Context, req *pb.TradeRequest) (*pb.
 		return nil, err
 	}
 
-	msgValue, err := proto.Marshal(&pb.TradeEvent{
+	ev := &pb.TradeEvent {
 		Trade:      req.GetTrade(),
 		ReceivedAt: timestamppb.Now(),
 		RequestId: 	requestID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("Failed to Marshal to TradeEvent: [%v]", err)
-	}
-	msg := &sarama.ProducerMessage{
-		Topic: s.requestsTopic,
-		Key:   sarama.StringEncoder(symbol),
-		Value: sarama.ByteEncoder(msgValue),
 	}
 
-	partition, offset, err := s.producer.SendMessage(msg)
-	if err != nil {
-		slog.Warn("AFE: Failed to send message", "error", err)
-	} else {
-		slog.Debug("AFE: Message sent!", "partition", partition, "offset", offset, "message", msgValue)
+	if err := s.producer.Send(s.requestsTopic, symbol, ev); err != nil {
+		slog.Warn("AFE: Failed to send message", "err", err, "request_id", requestID, "symbol", symbol)
+		return nil, status.Errorf(codes.Unavailable, "failed to publish trade: %v", err)
 	}
 
 	return &pb.TradeResponse{}, nil
