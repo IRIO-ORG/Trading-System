@@ -47,12 +47,11 @@ go_library(
     visibility = ["//visibility:private"],
     deps = [
         "//common",
+        "//common/kafka",
         "//proto",
-        "@com_github_ibm_sarama//:sarama",
         "@org_golang_google_grpc//:grpc",
         "@org_golang_google_grpc//codes",
         "@org_golang_google_grpc//status",
-        "@org_golang_google_protobuf//proto",
         "@org_golang_google_protobuf//types/known/timestamppb",
     ],
 )
