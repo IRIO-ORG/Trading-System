@@ -23,7 +23,10 @@ var (
 // ./client --endpoint SubmitTrade --body '{"trade": {"instrument": {"symbol": "GOOG"},"price": "5990000","size": "1"}}'
 func submitTrade(client pb.ApplicationFrontendClient, json_request string) {
 	var proto_request pb.TradeRequest
-	protojson.Unmarshal([]byte(json_request), &proto_request)
+	err := protojson.Unmarshal([]byte(json_request), &proto_request)
+	if err != nil {
+		log.Fatalf("JSON Parse Error: %v.", err)
+	}
 	log.Printf("TradeRequest: %s", protojson.Format(&proto_request))
 	resp, err := client.SubmitTrade(context.Background(), &proto_request)
 	if err != nil {
