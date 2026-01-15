@@ -21,7 +21,7 @@ gcloud container clusters create trading-cluster \
 ### Get credentials
 
 ```sh
-gcloud container clusters get-credentials trading-cluster --zone europe-central2-a
+gcloud container clusters get-credentials trading-cluster --zone europe-central2-b
 ```
 
 [//]: # (### Add kafka repository to helm)
@@ -77,17 +77,19 @@ kubectl get svc
 ```
 
 Send a few requests to the system with the use of the client:
-
 ```sh
+# Remeber to set AFE_SERVICE_EXTERNAL_IP variable or 
+# to replace it with the IP address of the service
+
 # Sell GOOG 100 @ 10
-bazel run //client:client -- \
-  -server_address "{AFE-SERVICE_EXTERNAL_IP}:80" \
+bazel run //client -- \
+  -server_address "{AFE_SERVICE_EXTERNAL_IP}:80" \
   -endpoint "SubmitTrade" \
   -body '{"trade": {"side": "SELL", "price": "100", "size": "10", "instrument": {"symbol": "GOOG"}}}'
 
 # Buy GOOG 100 @ 10
-bazel run //client:client -- \
-  -server_address "{AFE-SERVICE_EXTERNAL_IP}:80" \
+bazel run //client -- \
+  -server_address "{AFE_SERVICE_EXTERNAL_IP}:80" \
   -endpoint "SubmitTrade" \
   -body '{"trade": {"side": "BUY", "price": "100", "size": "10", "instrument": {"symbol": "GOOG
 ```
