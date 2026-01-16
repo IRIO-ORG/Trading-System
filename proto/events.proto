@@ -41,7 +41,7 @@ message OrderBookOrder {
   string request_id = 1;
   uint64 price = 2;
   uint64 remaining = 3;
-  uint64 seq = 4; // TODO think if necessary
+  uint64 seq = 4;  // TODO think if necessary
 }
 
 message OrderBookSnapshot {
@@ -49,7 +49,8 @@ message OrderBookSnapshot {
   string symbol = 2;
   uint32 trades_partition = 3;
 
-  // Kafka offset of the last processed request in the trades topic at snapshot time.
+  // Kafka offset of the last processed request
+  // in the trades topic at snapshot time.
   int64 last_offset = 4;
   uint64 orderbook_seq = 5;
 
