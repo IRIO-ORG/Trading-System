@@ -3,9 +3,11 @@ package main
 import (
 	"container/heap"
 	"fmt"
+	"sync"
 	"time"
 
 	pb "github.com/IRIO-ORG/Trading-System/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type executed struct {
@@ -19,6 +21,7 @@ type executed struct {
 
 type engine struct {
 	books map[string]*orderBook
+	mut   sync.Mutex
 }
 
 func newEngine() *engine {
@@ -27,6 +30,93 @@ func newEngine() *engine {
 	}
 }
 
+type orderCopy struct {
+	id        string
+	price     uint64
+	remaining uint64
+	seq       uint64
+}
+
+type bookCopy struct {
+	seq  uint64
+	bids []orderCopy
+	asks []orderCopy
+}
+
+func (e *engine) createSnapshot(createdAt time.Time, tradesPartition int32, lastOffset int64) map[string]*pb.OrderBookSnapshot {
+	copies := make(map[string]bookCopy)
+
+	e.mut.Lock()
+	for symbol, ob := range e.books {
+		bc := bookCopy{
+			seq:  ob.seq,
+			bids: make([]orderCopy, 0, len(ob.bids)),
+			asks: make([]orderCopy, 0, len(ob.asks)),
+		}
+
+		for _, o := range ob.bids {
+			if o == nil {
+				continue
+			}
+			bc.bids = append(bc.bids, orderCopy{
+				id:        o.id,
+				price:     o.price,
+				remaining: o.remaining,
+				seq:       o.seq,
+			})
+		}
+		for _, o := range ob.asks {
+			if o == nil {
+				continue
+			}
+			bc.asks = append(bc.asks, orderCopy{
+				id:        o.id,
+				price:     o.price,
+				remaining: o.remaining,
+				seq:       o.seq,
+			})
+		}
+
+		copies[symbol] = bc
+	}
+	e.mut.Unlock()
+
+	out := make(map[string]*pb.OrderBookSnapshot, len(copies))
+	for symbol, bc := range copies {
+		snap := &pb.OrderBookSnapshot{
+			CreatedAt:       timestamppb.New(createdAt),
+			Symbol:          symbol,
+			LastOffset:      lastOffset,
+			OrderbookSeq:    bc.seq,
+			Bids:            make([]*pb.OrderBookOrder, 0, len(bc.bids)),
+			Asks:            make([]*pb.OrderBookOrder, 0, len(bc.asks)),
+			TradesPartition: uint32(tradesPartition),
+		}
+
+		for _, o := range bc.bids {
+			snap.Bids = append(snap.Bids, &pb.OrderBookOrder{
+				RequestId: o.id,
+				Price:     o.price,
+				Remaining: o.remaining,
+				Seq:       o.seq,
+			})
+		}
+		for _, o := range bc.asks {
+			snap.Asks = append(snap.Asks, &pb.OrderBookOrder{
+				RequestId: o.id,
+				Price:     o.price,
+				Remaining: o.remaining,
+				Seq:       o.seq,
+			})
+		}
+
+		out[symbol] = snap
+	}
+
+	return out
+}
+
+// onTrade must be called with e.mut acquired.
 func (e *engine) onTrade(ev *pb.TradeEvent) ([]executed, error) {
 	if ev == nil || ev.Trade == nil || ev.Trade.Instrument == nil {
 		return nil, fmt.Errorf("invalid TradeEvent: missing trade.instrument")
