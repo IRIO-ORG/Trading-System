@@ -13,7 +13,7 @@ In order to run the project on GCP with basic cluster setup, follow these steps:
 ### Create cluster
 ```sh
 gcloud container clusters create trading-cluster \
---zone europe-central2-a \
+--zone europe-central2-b \
 --num-nodes 1 \
 --machine-type e2-standard-2
 ```
@@ -21,52 +21,87 @@ gcloud container clusters create trading-cluster \
 ### Get credentials
 
 ```sh
-gcloud container clusters get-credentials trading-cluster --zone europe-central2-a
+gcloud container clusters get-credentials trading-cluster --zone europe-central2-b
 ```
 
-### Add kafka repository to helm
-```sh
-# Add bitnami repository
-helm repo add bitnami https://charts.bitnami.com/bitnami
+[//]: # (### Add kafka repository to helm)
 
-# Update helm repositories
-helm repo update
-```
+[//]: # (```sh)
+
+[//]: # (# Add bitnami repository)
+
+[//]: # (helm repo add bitnami https://charts.bitnami.com/bitnami)
+
+[//]: # ()
+[//]: # (# Update helm repositories)
+
+[//]: # (helm repo update)
+
+[//]: # (```)
 
 ### Install KRaft Kafka with the usage of helm
 
-> **⚠️ Security Note:** The configuration below uses `PLAINTEXT` for communication. This is intended **strictly for development simplicity**. In a production environment, you must disable plaintext listeners and enforce encryption (TLS/SSL) and authentication (SASL/mTLS).
-
 ```sh
-helm install my-kafka bitnami/kafka \
-  --set kraft.enabled=true \
-  --set zookeeper.enabled=false \
-  --set replicaCount=3 \
-  --set controller.replicaCount=3 \ # Controllers (Raft quorum)
-  --set listeners.client.protocol=PLAINTEXT \
-  --set listeners.interbroker.protocol=PLAINTEXT \
-  --set allowPlaintextListener=true \
-  --set image.registry=docker.io \
-  --set image.repository=bitnamilegacy/kafka
+helm install my-kafka oci://registry-1.docker.io/bitnamicharts/kafka -f k8s/kafka-values.yaml
 ```
 
-### Deploy to kubernetes
+If you want to update `kafka-values.yaml` and reload Kafka, you can use: 
 
+```sh
+helm uninstall my-kafka && kubectl delete pvc data-my-kafka-controller-0
+```
+
+And then, proceed with install once again.
+### Deploy to kubernetes
+Command below does the following:
+- Starts the job that creates kafka topics.
+- Deploys worker, application-frontend, application-frontend service and executed-trades worker.
+- Throws an error that `kafka-values.yaml` can't be processed - can be ignored.
 ```sh
 kubectl apply -f k8s/
 ```
 
+
 ### Check if it works
 
+In a new terminal tab run the following command, to see the logs from all the components:
 ```sh
-kubectl logs -l app=worker
+kubectl logs -f -l 'app in (afe, worker, executed-trades-worker)' --max-log-requests=10
 ```
 
+If everything deployed correctly `afe-service` should be accessible from outside of the cluster.
+To obtain the `extrernal_ip` you have to run
+
+```sh
+kubectl get svc
+```
+
+Send a few requests to the system with the use of the client:
+```sh
+# Remeber to set AFE_SERVICE_EXTERNAL_IP variable or 
+# to replace it with the IP address of the service
+
+# Sell GOOG 100 @ 10
+bazel run //client -- \
+  -server_address "{AFE_SERVICE_EXTERNAL_IP}:80" \
+  -endpoint "SubmitTrade" \
+  -body '{"trade": {"side": "SELL", "price": "100", "size": "10", "instrument": {"symbol": "GOOG"}}}'
+
+# Buy GOOG 100 @ 10
+bazel run //client -- \
+  -server_address "{AFE_SERVICE_EXTERNAL_IP}:80" \
+  -endpoint "SubmitTrade" \
+  -body '{"trade": {"side": "BUY", "price": "100", "size": "10", "instrument": {"symbol": "GOOG
+```
+
+Verify if outcome is desired.
+
+Alternatively, you can setup port-forwarding and use the default address and port on the client which is `localhost:50051`.
 ### Clean up
 **Remember to delete the cluster when you are done with it, to save the reosurces.**
 
 ```sh
-gcloud container clusters delete trading-cluster --zone europe-central2-a
+gcloud container clusters delete trading-cluster --zone europe-central2-b
 ```
 
 ## Bazel cheatsheet
