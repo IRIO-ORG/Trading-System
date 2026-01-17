@@ -21,8 +21,12 @@ import (
 const (
 	defaultRequestsTopic   = "trade-requests"
 	defaultExecutedTopic   = "executed-trades"
+	defaultSnapshotsTopic  = "orderbook-snapshots"
 	defaultConsumerGroupID = "worker-group"
 	defaultWorkerMode      = "engine"
+
+	defaultSnapshotIntervalSeconds = 20 // Na testy
+	defaultSnapshotThreshold       = 10
 )
 
 type TopicProducer struct {
@@ -40,15 +44,24 @@ func (tp *TopicProducer) TPSend(key string, msg proto.Message) error {
 
 // TODO once MVP is done, move to internal package
 type WorkerHandler struct {
-	mode     string
-	producer *TopicProducer
+	mode             string
+	producer         *TopicProducer // TODO: refactor to executedProducer
+	snapshotProducer *TopicProducer
+
+	snapshotInterval  time.Duration
+	snapshotThreshold int
 }
 
 func main() {
 	requestsTopic, _ := common.GetEnv("REQUESTS_TOPIC", defaultRequestsTopic)
 	executedTopic, _ := common.GetEnv("EXECUTED_TRADES_TOPIC", defaultExecutedTopic)
+	snapshotsTopic, _ := common.GetEnv("SNAPSHOTS_TOPIC", defaultSnapshotsTopic)
 	groupID, _ := common.GetEnv("WORKER_GROUP_ID", defaultConsumerGroupID)
 	mode, _ := common.GetEnv("WORKER_MODE", defaultWorkerMode)
+
+	snapIntervalSecs, _ := common.GetEnv("SNAPSHOT_INTERVAL_SECONDS", defaultSnapshotIntervalSeconds)
+	snapThreshold, _ := common.GetEnv("SNAPSHOT_ORDER_THRESHOLD", defaultSnapshotThreshold)
+	snapInterval := time.Duration(snapIntervalSecs) * time.Second
 
 	slog.Info("WORKER: Starting Trades topic worker...", "mode", mode)
 
@@ -59,18 +72,32 @@ func main() {
 
 	executedTradesProducer, err := kafka.NewProtoProducer()
 	if err != nil {
-		slog.Error("WORKER: Critical error creating producer", "error", err)
+		slog.Error("WORKER: Critical error creating executed-trades producer", "error", err)
 		os.Exit(1)
 	}
 	defer func() {
 		if err := executedTradesProducer.Close(); err != nil {
-			slog.Error("WORKER: Error closing producer", "error", err)
+			slog.Error("WORKER: Error closing executed-trades producer", "error", err)
+		}
+	}()
+
+	snapshotsProducer, err := kafka.NewProtoProducer()
+	if err != nil {
+		slog.Error("WORKER: Critical error creating snapshot producer", "error", err)
+		os.Exit(1)
+	}
+	defer func() {
+		if err := snapshotsProducer.Close(); err != nil {
+			slog.Error("WORKER: Error closing snapshot producer", "error", err)
 		}
 	}()
 
 	handler := &WorkerHandler{
-		mode:     mode,
-		producer: NewTopicProducer(executedTopic, executedTradesProducer),
+		mode:              mode,
+		producer:          NewTopicProducer(executedTopic, executedTradesProducer),
+		snapshotProducer:  NewTopicProducer(snapshotsTopic, snapshotsProducer),
+		snapshotInterval:  snapInterval,
+		snapshotThreshold: snapThreshold,
 	}
 
 	err = kafka.RunConsumerGroup(groupID, []string{requestsTopic}, handler)
@@ -86,6 +113,13 @@ func (h *WorkerHandler) Cleanup(_ sarama.ConsumerGroupSession) error { return ni
 func (h *WorkerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	partition := claim.Partition()
 	eng := newEngine()
+
+	var snapper *Snapshotter
+	if h.mode == "engine" {
+		snapper = NewSnapshotter(int32(partition), h.snapshotInterval, h.snapshotThreshold, eng, h.snapshotProducer)
+		snapper.Start()
+		defer snapper.Stop()
+	}
 
 	for msg := range claim.Messages() {
 		if msg == nil {
@@ -119,8 +153,10 @@ func (h *WorkerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim 
 		reqID := req.GetRequestId()
 		symbol := req.GetTrade().GetInstrument().GetSymbol()
 
+		eng.mut.Lock()
 		execs, err := eng.onTrade(req)
 		if err != nil {
+			eng.mut.Unlock()
 			slog.Warn("WORKER: onTrade failed",
 				"error", err,
 				"request_id", reqID,
@@ -133,6 +169,10 @@ func (h *WorkerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim 
 		}
 
 		if len(execs) == 0 {
+			if snapper != nil {
+				snapper.ObserveProcessed(msg.Offset)
+			}
+			eng.mut.Unlock()
 			slog.Info("WORKER: accepted (no match)",
 				"request_id", reqID,
 				"symbol", symbol,
@@ -158,11 +198,17 @@ func (h *WorkerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim 
 					"error", err,
 					"executed-trade", executedTrade,
 				)
+				eng.mut.Unlock()
 				return err
 			}
 
 			slog.Info("WORKER: executed", "executed-trade", executedTrade.String())
 		}
+
+		if snapper != nil {
+			snapper.ObserveProcessed(msg.Offset)
+		}
+		eng.mut.Unlock()
 
 		session.MarkMessage(msg, "")
 	}
