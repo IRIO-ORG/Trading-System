@@ -45,7 +45,7 @@ func (tp *TopicProducer) TPSend(key string, msg proto.Message) error {
 // TODO once MVP is done, move to internal package
 type WorkerHandler struct {
 	mode             string
-	producer         *TopicProducer // TODO: refactor to executedProducer
+	executedProducer *TopicProducer
 	snapshotProducer *TopicProducer
 
 	snapshotInterval  time.Duration
@@ -94,7 +94,7 @@ func main() {
 
 	handler := &WorkerHandler{
 		mode:              mode,
-		producer:          NewTopicProducer(executedTopic, executedTradesProducer),
+		executedProducer:  NewTopicProducer(executedTopic, executedTradesProducer),
 		snapshotProducer:  NewTopicProducer(snapshotsTopic, snapshotsProducer),
 		snapshotInterval:  snapInterval,
 		snapshotThreshold: snapThreshold,
@@ -193,7 +193,7 @@ func (h *WorkerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim 
 				AskRequestId: ex.sellID,
 				ExecutedAt:   timestamppb.New(ex.execTime),
 			}
-			if err := h.producer.TPSend(ex.symbol, executedTrade); err != nil {
+			if err := h.executedProducer.TPSend(ex.symbol, executedTrade); err != nil {
 				slog.Error("WORKER: failed to send executed trade",
 					"error", err,
 					"executed-trade", executedTrade,

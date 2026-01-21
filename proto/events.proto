@@ -49,8 +49,8 @@ message OrderBookSnapshot {
   string symbol = 2;
   uint32 trades_partition = 3;
 
-  // Kafka offset of the last processed request
-  // in the trades topic at snapshot time.
+  // Kafka offset of the last processed request in the trades topic at snapshot
+  // time.
   int64 last_offset = 4;
   uint64 orderbook_seq = 5;
 

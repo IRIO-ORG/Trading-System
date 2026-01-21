@@ -30,70 +30,23 @@ func newEngine() *engine {
 	}
 }
 
-type orderCopy struct {
-	id        string
-	price     uint64
-	remaining uint64
-	seq       uint64
-}
-
-type bookCopy struct {
-	seq  uint64
-	bids []orderCopy
-	asks []orderCopy
-}
-
-func (e *engine) createSnapshot(createdAt time.Time, tradesPartition int32, lastOffset int64) map[string]*pb.OrderBookSnapshot {
-	copies := make(map[string]bookCopy)
-
-	e.mut.Lock()
+func (e *engine) createSnapshotLocked(createdAt time.Time, tradesPartition int32, lastOffset int64) map[string]*pb.OrderBookSnapshot {
+	out := make(map[string]*pb.OrderBookSnapshot)
 	for symbol, ob := range e.books {
-		bc := bookCopy{
-			seq:  ob.seq,
-			bids: make([]orderCopy, 0, len(ob.bids)),
-			asks: make([]orderCopy, 0, len(ob.asks)),
+		snap := &pb.OrderBookSnapshot{
+			CreatedAt:       timestamppb.New(createdAt),
+			Symbol:          symbol,
+			LastOffset:      lastOffset,
+			OrderbookSeq:    ob.seq,
+			Bids:            make([]*pb.OrderBookOrder, 0, len(ob.bids)),
+			Asks:            make([]*pb.OrderBookOrder, 0, len(ob.asks)),
+			TradesPartition: uint32(tradesPartition),
 		}
 
 		for _, o := range ob.bids {
 			if o == nil {
 				continue
 			}
-			bc.bids = append(bc.bids, orderCopy{
-				id:        o.id,
-				price:     o.price,
-				remaining: o.remaining,
-				seq:       o.seq,
-			})
-		}
-		for _, o := range ob.asks {
-			if o == nil {
-				continue
-			}
-			bc.asks = append(bc.asks, orderCopy{
-				id:        o.id,
-				price:     o.price,
-				remaining: o.remaining,
-				seq:       o.seq,
-			})
-		}
-
-		copies[symbol] = bc
-	}
-	e.mut.Unlock()
-
-	out := make(map[string]*pb.OrderBookSnapshot, len(copies))
-	for symbol, bc := range copies {
-		snap := &pb.OrderBookSnapshot{
-			CreatedAt:       timestamppb.New(createdAt),
-			Symbol:          symbol,
-			LastOffset:      lastOffset,
-			OrderbookSeq:    bc.seq,
-			Bids:            make([]*pb.OrderBookOrder, 0, len(bc.bids)),
-			Asks:            make([]*pb.OrderBookOrder, 0, len(bc.asks)),
-			TradesPartition: uint32(tradesPartition),
-		}
-
-		for _, o := range bc.bids {
 			snap.Bids = append(snap.Bids, &pb.OrderBookOrder{
 				RequestId: o.id,
 				Price:     o.price,
@@ -101,7 +54,10 @@ func (e *engine) createSnapshot(createdAt time.Time, tradesPartition int32, last
 				Seq:       o.seq,
 			})
 		}
-		for _, o := range bc.asks {
+		for _, o := range ob.asks {
+			if o == nil {
+				continue
+			}
 			snap.Asks = append(snap.Asks, &pb.OrderBookOrder{
 				RequestId: o.id,
 				Price:     o.price,

@@ -87,13 +87,15 @@ func (s *Snapshotter) loop() {
 func (s *Snapshotter) flush(reason string) {
 	s.ordersSinceSnap.Store(0)
 
+	s.eng.mut.Lock()
 	offset := s.lastOffset.Load()
 	if offset < 0 {
+		s.eng.mut.Unlock()
 		return
 	}
-
 	createdAt := time.Now().UTC()
-	snaps := s.eng.createSnapshot(createdAt, s.partition, offset)
+	snaps := s.eng.createSnapshotLocked(createdAt, s.partition, offset)
+	s.eng.mut.Unlock()
 	if len(snaps) == 0 {
 		return
 	}
