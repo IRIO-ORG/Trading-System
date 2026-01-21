@@ -3,9 +3,11 @@ package main
 import (
 	"container/heap"
 	"fmt"
+	"sync"
 	"time"
 
 	pb "github.com/IRIO-ORG/Trading-System/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type executed struct {
@@ -19,6 +21,7 @@ type executed struct {
 
 type engine struct {
 	books map[string]*orderBook
+	mut   sync.Mutex
 }
 
 func newEngine() *engine {
@@ -27,6 +30,49 @@ func newEngine() *engine {
 	}
 }
 
+func (e *engine) createSnapshotLocked(createdAt time.Time, tradesPartition int32, lastOffset int64) map[string]*pb.OrderBookSnapshot {
+	out := make(map[string]*pb.OrderBookSnapshot)
+	for symbol, ob := range e.books {
+		snap := &pb.OrderBookSnapshot{
+			CreatedAt:       timestamppb.New(createdAt),
+			Symbol:          symbol,
+			LastOffset:      lastOffset,
+			OrderbookSeq:    ob.seq,
+			Bids:            make([]*pb.OrderBookOrder, 0, len(ob.bids)),
+			Asks:            make([]*pb.OrderBookOrder, 0, len(ob.asks)),
+			TradesPartition: uint32(tradesPartition),
+		}
+
+		for _, o := range ob.bids {
+			if o == nil {
+				continue
+			}
+			snap.Bids = append(snap.Bids, &pb.OrderBookOrder{
+				RequestId: o.id,
+				Price:     o.price,
+				Remaining: o.remaining,
+				Seq:       o.seq,
+			})
+		}
+		for _, o := range ob.asks {
+			if o == nil {
+				continue
+			}
+			snap.Asks = append(snap.Asks, &pb.OrderBookOrder{
+				RequestId: o.id,
+				Price:     o.price,
+				Remaining: o.remaining,
+				Seq:       o.seq,
+			})
+		}
+
+		out[symbol] = snap
+	}
+
+	return out
+}
+
+// onTrade must be called with e.mut acquired.
 func (e *engine) onTrade(ev *pb.TradeEvent) ([]executed, error) {
 	if ev == nil || ev.Trade == nil || ev.Trade.Instrument == nil {
 		return nil, fmt.Errorf("invalid TradeEvent: missing trade.instrument")

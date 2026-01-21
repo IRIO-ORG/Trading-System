@@ -44,6 +44,7 @@ go_library(
         "engine.go",
         "orderbook.go",
         "dump.go",
+        "snapshotter.go",
     ],
     importpath = "github.com/IRIO-ORG/Trading-System/worker",
     visibility = ["//visibility:private"],

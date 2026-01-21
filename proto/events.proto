@@ -37,10 +37,23 @@ message ExecutedTradeEvent {
   string execution_id = 7;
 }
 
-// Placeholder for snapshot of the order book at a specific point in time.
+message OrderBookOrder {
+  string request_id = 1;
+  uint64 price = 2;
+  uint64 remaining = 3;
+  uint64 seq = 4;  // TODO think if necessary
+}
+
 message OrderBookSnapshot {
-  // Timestamp when the snapshot was taken.
-  // Note: The field number can be changed when the rest is defined.
   google.protobuf.Timestamp created_at = 1;
-  // ...Further fields to represent the order book state TBD.
+  string symbol = 2;
+  uint32 trades_partition = 3;
+
+  // Kafka offset of the last processed request in the trades topic at snapshot
+  // time.
+  int64 last_offset = 4;
+  uint64 orderbook_seq = 5;
+
+  repeated OrderBookOrder bids = 6;
+  repeated OrderBookOrder asks = 7;
 }
