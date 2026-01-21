@@ -31,7 +31,7 @@ spec:
               done
 
               echo "Creating topics (idempotent) ..."
-              /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server "${BOOTSTRAP}" --create --if-not-exists --topic trades --partitions 1 --replication-factor 1
+              /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server "${BOOTSTRAP}" --create --if-not-exists --topic trade-requests --partitions 1 --replication-factor 1
 
               /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server "${BOOTSTRAP}" --create --if-not-exists --topic executed-trades --partitions 1 --replication-factor 1
 

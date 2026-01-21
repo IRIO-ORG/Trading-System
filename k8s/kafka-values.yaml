@@ -1,13 +1,26 @@
-# helm install my-kafka oci://registry-1.docker.io/bitnamicharts/kafka -f k8s/kafka-values.yaml
-
 kraft:
   enabled: true
 
 zookeeper:
   enabled: false
 
+# One may want to set replicaCount to 1 for test purposes and resources savings
+# Unfortunately when running Kafka in kraft mode, bitnami drops the overwrite of
+# KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR to 1 resulting in Kafka crushing
 controller:
-  replicaCount: 1
+  replicaCount: 3
+  # Limit the memory so 3 instances fit on e2-standard-2 cluster
+  heapOpts: "-Xmx512m -Xms512m"
+  resources:
+    requests:
+      memory: "768Mi"
+      cpu: "100m"
+    limits:
+      memory: "1024Mi"
+      cpu: "500m"
+
+# Allow to run multiple kafka instances on one node
+podAntiAffinityPreset: "soft"
 
 listeners:
   client:
