@@ -6,6 +6,12 @@ bazel_dep(name = "rules_oci", version = "2.2.6")
 bazel_dep(name = "rules_pkg", version = "1.1.0")
 bazel_dep(name = "protobuf", version = "33.2")
 
+local_config_platform = use_extension(
+    "@bazel_tools//tools/platforms:extensions.bzl",
+    "local_config_platform",
+)
+use_repo(local_config_platform, "local_config_platform")
+
 go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
 go_sdk.download(version = "1.25.5")
 go_sdk.nogo(nogo = "//:nogo")
