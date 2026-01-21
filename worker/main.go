@@ -43,6 +43,7 @@ func (tp *TopicProducer) TPSend(key string, msg proto.Message) error {
 // TODO once MVP is done, move to internal package
 type WorkerHandler struct {
 	mode             string
+	snapshotTopic    string
 	producer         *TopicProducer
 	snapshotProducer *TopicProducer
 }
@@ -85,6 +86,7 @@ func main() {
 
 	handler := &WorkerHandler{
 		mode:             mode,
+		snapshotTopic:    snapshotTopic,
 		producer:         NewTopicProducer(executedTopic, executedTradesProducer),
 		snapshotProducer: NewTopicProducer(snapshotTopic, snapshotProducer),
 	}
@@ -137,7 +139,16 @@ func (h *PartitionHandler) processMessage(msg *sarama.ConsumerMessage, session s
 	reqID := req.GetRequestId()
 	symbol := req.GetTrade().GetInstrument().GetSymbol()
 
-	execs, err := h.eng.onTrade(req)
+	execs, err := h.eng.onTrade(req, func(symbol string) *orderBook {
+		snapshot, err := GetSnapshotForSymbol(h.worker.snapshotTopic, symbol)
+		if err != nil {
+			slog.Warn("WORKER: failed to fetch snapshot", "symbol", symbol)
+		}
+		if snapshot == nil {
+			snapshot = &pb.OrderBookSnapshot{}
+		}
+		return newOrderBookFromSnapshot(snapshot)
+	})
 	if err != nil {
 		slog.Warn("WORKER: onTrade failed",
 			"error", err,
@@ -193,9 +204,9 @@ func (h *PartitionHandler) makeSnapshot(symbol string) error {
 		return nil
 	}
 
-	orders := make([]pb.Order, 1)
+	orders := make([]*pb.Order, 1)
 	for _, ask := range book.asks {
-		orders = append(orders, pb.Order{
+		orders = append(orders, &pb.Order{
 			RequestId: ask.id,
 			Side:      ask.side,
 			Price:     ask.price,
@@ -204,7 +215,7 @@ func (h *PartitionHandler) makeSnapshot(symbol string) error {
 		})
 	}
 	for _, bid := range book.bids {
-		orders = append(orders, pb.Order{
+		orders = append(orders, &pb.Order{
 			RequestId: bid.id,
 			Side:      bid.side,
 			Price:     bid.price,
@@ -216,6 +227,7 @@ func (h *PartitionHandler) makeSnapshot(symbol string) error {
 	return h.worker.snapshotProducer.TPSend(symbol, &pb.OrderBookSnapshot{
 		CreatedAt: timestamppb.Now(),
 		Symbol:    symbol,
+		NextSeq:   book.seq + 1,
 		Orders:    orders,
 	})
 }

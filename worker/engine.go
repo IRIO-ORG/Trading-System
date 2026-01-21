@@ -27,7 +27,7 @@ func newEngine() *engine {
 	}
 }
 
-func (e *engine) onTrade(ev *pb.TradeEvent) ([]executed, error) {
+func (e *engine) onTrade(ev *pb.TradeEvent, orderBookFactory func(string) *orderBook) ([]executed, error) {
 	if ev == nil || ev.Trade == nil || ev.Trade.Instrument == nil {
 		return nil, fmt.Errorf("invalid TradeEvent: missing trade.instrument")
 	}
@@ -44,7 +44,7 @@ func (e *engine) onTrade(ev *pb.TradeEvent) ([]executed, error) {
 
 	ob := e.books[symbol]
 	if ob == nil {
-		ob = newOrderBook()
+		ob = orderBookFactory(symbol)
 		e.books[symbol] = ob
 	}
 

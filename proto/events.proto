@@ -40,8 +40,10 @@ message ExecutedTradeEvent {
 message OrderBookSnapshot {
   // Timestamp when the snapshot was taken.
   google.protobuf.Timestamp created_at = 1;
-  // Symbol that the snapshot concerns
+  // Symbol that the snapshot concerns.
   string symbol = 2;
+  // Next sequence number of a trade in this book.
+  uint64 next_seq = 3;
   // Orders that were part of the order book the moment snapshot was taken.
-  repeated Order orders = 3;
+  repeated Order orders = 4;
 }

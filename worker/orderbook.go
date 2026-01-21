@@ -2,8 +2,10 @@ package main
 
 import (
 	"container/heap"
+	"log/slog"
 
 	pb "github.com/IRIO-ORG/Trading-System/proto"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type order struct {
@@ -75,4 +77,29 @@ func newOrderBook() *orderBook {
 	heap.Init(&ob.bids)
 	heap.Init(&ob.asks)
 	return ob
+}
+
+func newOrderBookFromSnapshot(snap *pb.OrderBookSnapshot) *orderBook {
+	book := orderBook{
+		seq: snap.NextSeq,
+	}
+	for _, o := range snap.Orders {
+		if o.Side == pb.Side_SELL {
+			book.bids.Push(o)
+		} else if o.Side == pb.Side_BUY {
+			book.asks.Push(o)
+		} else {
+			marshaler := protojson.MarshalOptions{
+				Multiline:       false,
+				EmitUnpopulated: true,
+			}
+			jsonReq, err := marshaler.Marshal(o)
+			if err != nil {
+				slog.Warn("Marshal error", "error", err)
+			} else {
+				slog.Warn("Unknown order side", "msg", jsonReq)
+			}
+		}
+	}
+	return &book
 }

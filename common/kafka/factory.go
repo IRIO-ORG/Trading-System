@@ -9,8 +9,8 @@ import (
 	"github.com/IRIO-ORG/Trading-System/common"
 )
 
-// getBrokers returns a list of Kafka brokers from the environment variable KAFKA_BROKER_ADDR.
-func getBrokers() []string {
+// GetBrokers returns a list of Kafka brokers from the environment variable KAFKA_BROKER_ADDR.
+func GetBrokers() []string {
 	addr, _ := common.GetEnv("KAFKA_BROKER_ADDR", "localhost:9092")
 	// Split on comma to allow for multiple brokers
 	return strings.Split(addr, ",")
@@ -18,7 +18,7 @@ func getBrokers() []string {
 
 // NewProducer creates a SyncProducer with a reliable configuration and connection retry mechanism.
 func NewProducer() (sarama.SyncProducer, error) {
-	brokers := getBrokers()
+	brokers := GetBrokers()
 
 	config := sarama.NewConfig()
 	// The producer waits for the message to be committed by the broker.
@@ -43,7 +43,7 @@ func NewProducer() (sarama.SyncProducer, error) {
 
 // NewConsumerGroup creates a Consumer Group with a retry mechanism and reliable offsets.
 func NewConsumerGroup(groupID string) (sarama.ConsumerGroup, error) {
-	brokers := getBrokers()
+	brokers := GetBrokers()
 
 	config := sarama.NewConfig()
 	// The consumer returns errors to the Errors() channel.
