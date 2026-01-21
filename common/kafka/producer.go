@@ -12,9 +12,19 @@ type ProtoProducer struct {
 	internal sarama.SyncProducer
 }
 
+// NewProtoProducerWithLexographicalPartitioner creates a new
+// wrapped producer using the LexicographicalPartitioner.
+func NewProtoProducerWithLexographicalPartitioner() (*ProtoProducer, error) {
+	saramaProd, err := NewProducer(NewLexicographicalPartitioner)
+	if err != nil {
+		return nil, err
+	}
+	return &ProtoProducer{internal: saramaProd}, nil
+}
+
 // NewProtoProducer creates a new wrapped producer using the factory defined in `factory.go`.
 func NewProtoProducer() (*ProtoProducer, error) {
-	saramaProd, err := NewProducer()
+	saramaProd, err := NewProducer(sarama.NewHashPartitioner)
 	if err != nil {
 		return nil, err
 	}

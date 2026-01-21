@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "consumer_runner.go",
         "factory.go",
+        "partitioner.go",
         "producer.go"
     ],
     importpath = "github.com/IRIO-ORG/Trading-System/common/kafka",

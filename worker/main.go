@@ -42,7 +42,6 @@ func (tp *TopicProducer) TPSend(key string, msg proto.Message) error {
 	return tp.producer.Send(tp.topic, key, msg)
 }
 
-// TODO once MVP is done, move to internal package
 type WorkerHandler struct {
 	mode             string
 	executedProducer *TopicProducer
