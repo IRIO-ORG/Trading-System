@@ -19,12 +19,12 @@ import (
 
 // TODO remove once config map kafka is setup
 const (
-	defaultRequestsTopic          = "trade-requests"
-	defaultExecutedTopic          = "executed-trades"
-	defaultSnapshotsTopic         = "orderbook-snapshots"
-	defaultConsumerGroupID        = "worker-group"
-	defaultWorkerMode             = "engine"
-	maxPendingSnapshotChannelSize = 8
+	defaultRequestsTopic   = "trade-requests"
+	defaultExecutedTopic   = "executed-trades"
+	defaultSnapshotsTopic  = "orderbook-snapshots"
+	defaultConsumerGroupID = "worker-group"
+	defaultWorkerMode      = "engine"
+	snapshotInterval       = 500 * time.Millisecond
 )
 
 type TopicProducer struct {
@@ -100,10 +100,9 @@ func (h *WorkerHandler) Setup(_ sarama.ConsumerGroupSession) error   { return ni
 func (h *WorkerHandler) Cleanup(_ sarama.ConsumerGroupSession) error { return nil }
 
 type PartitionHandler struct {
-	partitionId      int32
-	eng              *engine
-	worker           *WorkerHandler
-	snapshotRequests <-chan string
+	partitionId int32
+	eng         *engine
+	worker      *WorkerHandler
 }
 
 func (h *PartitionHandler) processMessage(msg *sarama.ConsumerMessage, session sarama.ConsumerGroupSession) error {
@@ -187,7 +186,7 @@ func (h *PartitionHandler) processMessage(msg *sarama.ConsumerMessage, session s
 	return nil
 }
 
-func (h *PartitionHandler) processSnapshot(symbol string) error {
+func (h *PartitionHandler) makeSnapshot(symbol string) error {
 	book, exists := h.eng.books[symbol]
 	if !exists {
 		slog.Warn("Snapshot request for unknown symbol", "symbol", symbol)
@@ -223,11 +222,11 @@ func (h *PartitionHandler) processSnapshot(symbol string) error {
 
 func (h *WorkerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	partitionHandler := PartitionHandler{
-		partitionId:      claim.Partition(),
-		eng:              newEngine(),
-		worker:           h,
-		snapshotRequests: make(<-chan string, maxPendingSnapshotChannelSize),
+		partitionId: claim.Partition(),
+		eng:         newEngine(),
+		worker:      h,
 	}
+	snapshotTicker := time.NewTicker(snapshotInterval)
 
 	for {
 		select {
@@ -237,12 +236,12 @@ func (h *WorkerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim 
 				return nil
 			}
 			partitionHandler.processMessage(msg, session)
-		case symbol, ok := <-partitionHandler.snapshotRequests:
-			if !ok {
-				// This shouldn't happen
-				return fmt.Errorf("Snapshot channel closed unexpectedly!")
+		case t := <-snapshotTicker.C:
+			slog.Info("Starting snapshot...", "partition", partitionHandler.partitionId, "time", t)
+			for symbol, _ := range partitionHandler.eng.books {
+				partitionHandler.makeSnapshot(symbol)
 			}
-			partitionHandler.processSnapshot(symbol)
+			slog.Info("Snapshot finished!", "partition", partitionHandler.partitionId)
 		}
 	}
 }
