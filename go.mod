@@ -7,6 +7,7 @@ tool golang.org/x/tools
 require (
 	github.com/IBM/sarama v1.46.3
 	google.golang.org/protobuf v1.36.11
+	github.com/lib/pq v1.10.9
 )
 
 require (

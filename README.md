@@ -7,8 +7,12 @@ Authors: Tomasz Głąb, Hubert Krupniewski. Piotr Wieczorek
 
 
 ## How to run on GCP
+ 
+There are two ways to run the project on GCP:
 
-In order to run the project on GCP with basic cluster setup, follow these steps:
+1. Automatically, using ```sh scripts/deploy.sh``` script.
+2. Manually, following the instructions below.
+
 
 ### Create cluster
 ```sh
@@ -49,6 +53,15 @@ If you want to update `kafka-values.yaml` and reload Kafka, you can use:
 
 ```sh
 helm uninstall my-kafka && kubectl delete pvc data-my-kafka-controller-0
+```
+
+### Install postgres DB with the usage of helm:
+
+```sh
+helm install my-postgres oci://registry-1.docker.io/bitnamicharts/postgresql \
+      --set auth.postgresPassword=postgres \
+      --set auth.database=trading_db \
+      --wait
 ```
 
 And then, proceed with install once again.
@@ -100,8 +113,10 @@ Alternatively, you can setup port-forwarding and use the default address and por
 ### Clean up
 **Remember to delete the cluster when you are done with it, to save the reosurces.**
 
+Just run:
+
 ```sh
-gcloud container clusters delete trading-cluster --zone europe-central2-b
+./scripts/destroy.sh
 ```
 
 ## Bazel cheatsheet
