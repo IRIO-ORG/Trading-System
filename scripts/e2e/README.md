@@ -33,14 +33,11 @@ Sends a series of BUY/SELL requests for multiple symbols (different prices and s
 
 2. `recovery.sh`
 
-Configures the worker snapshot cadence for the run, waits for a snapshot, sends additional traffic, then deletes the worker pod mid-window to simulate a crash. After restart it prints a Postgres summary (`trades` table) so you can inspect what was persisted.
+Uses the worker's built-in snapshot cadence, waits for a snapshot, sends additional traffic, then deletes the worker pod mid-window to simulate a crash. After restart it prints a Postgres summary (`trades` table) so you can inspect what was persisted.
 
 Notes:
 
 - The scripts intentionally avoid pass/fail assertions.
-- The recovery script uses `kubectl set env` on the `worker-deployment` to set:
-  - `SNAPSHOT_INTERVAL_SECONDS=40`
-  - `SNAPSHOT_ORDER_THRESHOLD=0` (disables threshold-triggered snapshots so the timing is predictable)
 
 ## Running
 

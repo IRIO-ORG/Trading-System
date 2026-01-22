@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/_helpers.sh"
+source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/helpers.sh"
 
 PF_PID=""
 LOG_TAIL_PID=""
@@ -16,11 +16,7 @@ ensure_port_forward
 start_cluster_log_tail
 
 log "=== E2E #2: recovery / crash simulation ==="
-log "Plan: set snapshot interval=40s (threshold disabled), send initial trades, wait for snapshot, send more trades, crash worker after ~20s, observe restart + subsequent snapshots and DB state."
-
-# Make snapshot timing predictable.
-restart_worker_with_snapshot_settings 40 0
-wait_for_worker_ready
+log "Plan: snapshot interval=40s, threshold=10, send initial trades, wait for snapshot, send more trades, crash worker after ~20s, observe restart + subsequent snapshots and DB state."
 
 log "Step 1: Initial traffic (ensure worker has state before first timer snapshot)"
 send_trade "GOOG" "SELL" 100 10
