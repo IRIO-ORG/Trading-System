@@ -42,7 +42,6 @@ func ConnectWithRetries(cfg Config) (*sql.DB, error) {
 	var err error
 
 	// Retry loop
-	maxRetries := 10
 	for i := 0; i < maxRetries; i++ {
 		db, err = sql.Open("postgres", connStr)
 		if err == nil {
