@@ -36,10 +36,14 @@ go_binary(
 
 go_library(
     name = "executed_trades_lib",
-    srcs = ["main.go"],
+    srcs = [
+        "handler.go",
+        "main.go"
+    ],
     importpath = "github.com/IRIO-ORG/Trading-System/executed-trades",
     visibility = ["//visibility:private"],
     deps = [
+        "//common/database",
         "//common/kafka",
         "//proto",
         "@com_github_ibm_sarama//:sarama",
