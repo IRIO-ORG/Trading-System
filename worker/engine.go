@@ -38,8 +38,8 @@ func (e *engine) createSnapshotLocked(createdAt time.Time, tradesPartition int32
 			Symbol:          symbol,
 			LastOffset:      lastOffset,
 			OrderbookSeq:    ob.seq,
-			Bids:            make([]*pb.OrderBookOrder, 0, len(ob.bids)),
-			Asks:            make([]*pb.OrderBookOrder, 0, len(ob.asks)),
+			Bids:            make([]*pb.Order, 0, len(ob.bids)),
+			Asks:            make([]*pb.Order, 0, len(ob.asks)),
 			TradesPartition: uint32(tradesPartition),
 		}
 
@@ -47,7 +47,7 @@ func (e *engine) createSnapshotLocked(createdAt time.Time, tradesPartition int32
 			if o == nil {
 				continue
 			}
-			snap.Bids = append(snap.Bids, &pb.OrderBookOrder{
+			snap.Bids = append(snap.Bids, &pb.Order{
 				RequestId: o.id,
 				Price:     o.price,
 				Remaining: o.remaining,
@@ -58,7 +58,7 @@ func (e *engine) createSnapshotLocked(createdAt time.Time, tradesPartition int32
 			if o == nil {
 				continue
 			}
-			snap.Asks = append(snap.Asks, &pb.OrderBookOrder{
+			snap.Asks = append(snap.Asks, &pb.Order{
 				RequestId: o.id,
 				Price:     o.price,
 				Remaining: o.remaining,

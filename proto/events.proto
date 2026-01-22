@@ -37,13 +37,6 @@ message ExecutedTradeEvent {
   string execution_id = 7;
 }
 
-message OrderBookOrder {
-  string request_id = 1;
-  uint64 price = 2;
-  uint64 remaining = 3;
-  uint64 seq = 4;  // TODO think if necessary
-}
-
 message OrderBookSnapshot {
   google.protobuf.Timestamp created_at = 1;
   string symbol = 2;
@@ -54,6 +47,6 @@ message OrderBookSnapshot {
   int64 last_offset = 4;
   uint64 orderbook_seq = 5;
 
-  repeated OrderBookOrder bids = 6;
-  repeated OrderBookOrder asks = 7;
+  repeated Order bids = 6;
+  repeated Order asks = 7;
 }
