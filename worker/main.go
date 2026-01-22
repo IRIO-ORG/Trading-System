@@ -1,9 +1,6 @@
 package main
 
 import (
-	"crypto/rand"
-	"encoding/hex"
-	"fmt"
 	"log/slog"
 	"os"
 	"time"
@@ -201,7 +198,7 @@ func (h *WorkerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim 
 				Symbol:       ex.symbol,
 				Price:        ex.price,
 				Size:         ex.size,
-				ExecutionId:  newExecutedID(),
+				ExecutionId:  newExecutedID(ex),
 				BidRequestId: ex.buyID,
 				AskRequestId: ex.sellID,
 				ExecutedAt:   timestamppb.New(ex.execTime),
@@ -228,10 +225,6 @@ func (h *WorkerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim 
 	return nil
 }
 
-func newExecutedID() string {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		return fmt.Sprintf("exec-%d", time.Now().UnixNano())
-	}
-	return hex.EncodeToString(b)
+func newExecutedID(ex executed) string {
+	return ex.buyID + "-" + ex.sellID
 }
