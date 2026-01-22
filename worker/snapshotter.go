@@ -1,9 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"log/slog"
 	"sync/atomic"
 	"time"
+
+	"github.com/IBM/sarama"
+	pb "github.com/IRIO-ORG/Trading-System/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 // Snapshotter triggers periodic (or load-based) snapshot creation for a single
@@ -18,6 +23,8 @@ type Snapshotter struct {
 
 	eng      *engine
 	producer *TopicProducer
+	// The Kafka client used by snapshot topic consumers
+	snapshotClient sarama.Client
 
 	lastOffset      atomic.Int64
 	ordersSinceSnap atomic.Int64
@@ -109,4 +116,70 @@ func (s *Snapshotter) flush(reason string) {
 	}
 
 	slog.Info("WORKER: snapshot batch published", "partition", s.partition, "count", len(snaps), "reason", reason, "lastOffset", offset)
+}
+
+func (s *Snapshotter) findSnapshotInPartition(symbol string, topic string, partition int32, newestOffset int64, topicConsumer sarama.Consumer) (*pb.OrderBookSnapshot, error) {
+	if newestOffset == 0 {
+		// Partition is empty - no snapshots
+		return nil, nil
+	}
+	pc, err := topicConsumer.ConsumePartition(topic, partition, sarama.OffsetOldest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start partition consumer: %w", err)
+	}
+	defer pc.Close()
+
+	var latestSnapshot *pb.OrderBookSnapshot = nil
+	var lastOffset int64 = -1
+	for lastOffset < newestOffset {
+		select {
+		case msg := <-pc.Messages():
+			if string(msg.Key) != symbol {
+				continue
+			}
+			snapshot := &pb.OrderBookSnapshot{}
+			if err := proto.Unmarshal(msg.Value, snapshot); err != nil {
+				slog.Warn("Error unmarshalling snapshot", "symbol", symbol, "error", err)
+				continue
+			}
+			// Log compaction runs asynchronously, so there may be outdated snapshots
+			if latestSnapshot == nil || latestSnapshot.OrderbookSeq < snapshot.OrderbookSeq || latestSnapshot.CreatedAt.AsTime().Before(snapshot.CreatedAt.AsTime()) {
+				latestSnapshot = snapshot
+			}
+			lastOffset = msg.Offset
+
+		case err := <-pc.Errors():
+			return nil, fmt.Errorf("consumer error: %w", err)
+		}
+	}
+	return latestSnapshot, nil
+}
+
+func (s *Snapshotter) GetSnapshotForSymbol(symbol string, topic string, client sarama.Client) (*pb.OrderBookSnapshot, error) {
+	consumer, err := sarama.NewConsumerFromClient(client)
+	if err != nil {
+		return nil, fmt.Errorf("NewConsumerFromClient error: %v", err)
+	}
+	defer consumer.Close()
+	watermarksPerTopicAndPartition := consumer.HighWaterMarks()
+	watermarks, exists := watermarksPerTopicAndPartition[topic]
+	if !exists {
+		return nil, nil
+	}
+
+	var latestSnapshot *pb.OrderBookSnapshot = nil
+	for partition, watermark := range watermarks {
+		snapshot, err := s.findSnapshotInPartition(symbol, topic, partition, watermark, consumer)
+		if err != nil {
+			slog.Warn("Error when looking for snapshot in partition", "symbol", symbol, "topic", topic, "partition", partition)
+			continue
+		}
+		if snapshot == nil {
+			continue
+		}
+		if latestSnapshot == nil || latestSnapshot.OrderbookSeq < snapshot.OrderbookSeq || latestSnapshot.CreatedAt.AsTime().Before(snapshot.CreatedAt.AsTime()) {
+			latestSnapshot = snapshot
+		}
+	}
+	return latestSnapshot, nil
 }

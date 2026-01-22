@@ -40,10 +40,10 @@ go_binary(
 go_library(
     name = "worker_lib",
     srcs = [
-        "main.go",
-        "engine.go",
-        "orderbook.go",
         "dump.go",
+        "engine.go",
+        "main.go",
+        "orderbook.go",
         "snapshotter.go",
     ],
     importpath = "github.com/IRIO-ORG/Trading-System/worker",

@@ -68,3 +68,16 @@ func newOrderBook() *orderBook {
 	heap.Init(&ob.asks)
 	return ob
 }
+
+func newOrderBookFromSnapshot(snap *pb.OrderBookSnapshot) *orderBook {
+	book := orderBook{
+		seq: snap.OrderbookSeq,
+	}
+	for _, o := range snap.Bids {
+		book.bids.Push(o)
+	}
+	for _, o := range snap.Asks {
+		book.asks.Push(o)
+	}
+	return &book
+}

@@ -46,6 +46,9 @@ type WorkerHandler struct {
 	mode             string
 	executedProducer *TopicProducer
 	snapshotProducer *TopicProducer
+	snapshotTopic    string
+	// Snapshot topic client for creating consumers that recover data from this topic
+	snapshotClient sarama.Client
 
 	snapshotInterval  time.Duration
 	snapshotThreshold int
@@ -109,6 +112,17 @@ func main() {
 func (h *WorkerHandler) Setup(_ sarama.ConsumerGroupSession) error   { return nil }
 func (h *WorkerHandler) Cleanup(_ sarama.ConsumerGroupSession) error { return nil }
 
+func (h *WorkerHandler) findSnapshotRecoveryOrDefault(symbol string, snap *Snapshotter) *orderBook {
+	snapshot, err := snap.GetSnapshotForSymbol(symbol, h.snapshotTopic, h.snapshotClient)
+	if err != nil {
+		slog.Warn("WORKER: failed to fetch snapshot", "symbol", symbol)
+	}
+	if snapshot == nil {
+		snapshot = &pb.OrderBookSnapshot{}
+	}
+	return newOrderBookFromSnapshot(snapshot)
+}
+
 func (h *WorkerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	partition := claim.Partition()
 	eng := newEngine()
@@ -153,7 +167,7 @@ func (h *WorkerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim 
 		symbol := req.GetTrade().GetInstrument().GetSymbol()
 
 		eng.mut.Lock()
-		execs, err := eng.onTrade(req)
+		execs, err := eng.onTrade(req, func(s string) *orderBook { return h.findSnapshotRecoveryOrDefault(s, snapper) })
 		if err != nil {
 			eng.mut.Unlock()
 			slog.Warn("WORKER: onTrade failed",
