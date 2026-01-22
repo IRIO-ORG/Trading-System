@@ -23,7 +23,7 @@ message Trade {
 
 message Order {
   // ID of the request that produced this order
-  string request_id = 1;
+  string id = 1;
   // Price in millis
   uint64 price = 2;
   // Size of the order
