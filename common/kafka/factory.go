@@ -17,7 +17,7 @@ func getBrokers() []string {
 }
 
 // NewProducer creates a SyncProducer with a reliable configuration and connection retry mechanism.
-func NewProducer() (sarama.SyncProducer, error) {
+func NewProducer(partitioner sarama.PartitionerConstructor) (sarama.SyncProducer, error) {
 	brokers := getBrokers()
 
 	config := sarama.NewConfig()
@@ -27,6 +27,8 @@ func NewProducer() (sarama.SyncProducer, error) {
 	config.Producer.RequiredAcks = sarama.WaitForAll
 	// The producer retries up to 5 times before giving up.
 	config.Producer.Retry.Max = 5
+	// The partitioner is used to determine the partition for each message.
+	config.Producer.Partitioner = partitioner
 
 	var prod sarama.SyncProducer
 	var err error

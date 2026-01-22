@@ -17,7 +17,7 @@ const (
 )
 
 func main() {
-	producer, err := kafka.NewProtoProducer()
+	producer, err := kafka.NewProtoProducerWithLexographicalPartitioner()
 	if err != nil {
 		slog.Error("NewProducer failed", "error", err)
 		os.Exit(1)
