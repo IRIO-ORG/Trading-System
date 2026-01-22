@@ -7,6 +7,8 @@ import (
 	"github.com/IBM/sarama"
 )
 
+const precisionLimit = 5
+
 // LexicographicalPartitioner distributes messages based on the alphabetical order of keys.
 // It maps keys to a continuous range [0.0, 1.0) and splits them evenly across available partitions.
 type LexicographicalPartitioner struct {
@@ -55,8 +57,6 @@ func calculateStringPosition(s string) float64 {
 	var score float64 = 0.0
 	var weight float64 = 1.0 / 26.0
 
-	// Limit precision to avoid floating point issues and unnecessary computation.
-	const precisionLimit = 5
 	limit := len(s)
 	if limit > precisionLimit {
 		limit = precisionLimit
