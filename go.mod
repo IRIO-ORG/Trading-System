@@ -7,6 +7,7 @@ tool golang.org/x/tools
 require (
 	github.com/IBM/sarama v1.46.3
 	google.golang.org/protobuf v1.36.11
+	github.com/lib/pq v1.10.9
 )
 
 require (
@@ -23,7 +24,6 @@ require (
 	github.com/jcmturner/gokrb5/v8 v8.4.4 // indirect
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
 	github.com/klauspost/compress v1.18.1 // indirect
-	github.com/lib/pq v1.10.9 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20250401214520-65e299d6c5c9 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
