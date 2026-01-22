@@ -7,6 +7,7 @@ import (
 	"time"
 
 	pb "github.com/IRIO-ORG/Trading-System/proto"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -38,8 +39,8 @@ func (e *engine) createSnapshotLocked(createdAt time.Time, tradesPartition int32
 			Symbol:          symbol,
 			LastOffset:      lastOffset,
 			OrderbookSeq:    ob.seq,
-			Bids:            make([]*pb.OrderBookOrder, 0, len(ob.bids)),
-			Asks:            make([]*pb.OrderBookOrder, 0, len(ob.asks)),
+			Bids:            make([]*pb.Order, 0, len(ob.bids)),
+			Asks:            make([]*pb.Order, 0, len(ob.asks)),
 			TradesPartition: uint32(tradesPartition),
 		}
 
@@ -47,23 +48,13 @@ func (e *engine) createSnapshotLocked(createdAt time.Time, tradesPartition int32
 			if o == nil {
 				continue
 			}
-			snap.Bids = append(snap.Bids, &pb.OrderBookOrder{
-				RequestId: o.id,
-				Price:     o.price,
-				Remaining: o.remaining,
-				Seq:       o.seq,
-			})
+			snap.Bids = append(snap.Bids, proto.CloneOf(o))
 		}
 		for _, o := range ob.asks {
 			if o == nil {
 				continue
 			}
-			snap.Asks = append(snap.Asks, &pb.OrderBookOrder{
-				RequestId: o.id,
-				Price:     o.price,
-				Remaining: o.remaining,
-				Seq:       o.seq,
-			})
+			snap.Asks = append(snap.Asks, proto.CloneOf(o))
 		}
 
 		out[symbol] = snap
@@ -73,7 +64,7 @@ func (e *engine) createSnapshotLocked(createdAt time.Time, tradesPartition int32
 }
 
 // onTrade must be called with e.mut acquired.
-func (e *engine) onTrade(ev *pb.TradeEvent) ([]executed, error) {
+func (e *engine) onTrade(ev *pb.TradeEvent, orderBookFactory func(string) *orderBook) ([]executed, error) {
 	if ev == nil || ev.Trade == nil || ev.Trade.Instrument == nil {
 		return nil, fmt.Errorf("invalid TradeEvent: missing trade.instrument")
 	}
@@ -90,99 +81,97 @@ func (e *engine) onTrade(ev *pb.TradeEvent) ([]executed, error) {
 
 	ob := e.books[symbol]
 	if ob == nil {
-		ob = newOrderBook()
+		ob = orderBookFactory(symbol)
 		e.books[symbol] = ob
 	}
 
 	ob.seq++
-	in := &order{
-		id:        ev.RequestId,
-		price:     ev.Trade.Price,
-		remaining: ev.Trade.Size,
-		seq:       ob.seq,
+	order := &pb.Order{
+		Id:    ev.RequestId,
+		Price: ev.Trade.Price,
+		Size:  ev.Trade.Size,
+		Seq:   ob.seq,
 	}
 
 	switch ev.Trade.Side {
 	case pb.Side_BUY:
-		in.side = pb.Side_BUY
-		return matchBuy(symbol, ob, in), nil
+		return matchBuy(symbol, ob, order), nil
 	case pb.Side_SELL:
-		in.side = pb.Side_SELL
-		return matchSell(symbol, ob, in), nil
+		return matchSell(symbol, ob, order), nil
 	default:
 		return nil, fmt.Errorf("unknown side: %v", ev.Trade.Side)
 	}
 }
 
-func matchBuy(symbol string, ob *orderBook, in *order) []executed {
+func matchBuy(symbol string, ob *orderBook, in *pb.Order) []executed {
 	var out []executed
 
-	for in.remaining > 0 {
+	for in.Size > 0 {
 		bestAsk := ob.asks.Peek()
 		if bestAsk == nil {
 			break
 		}
 
-		if bestAsk.price > in.price {
+		if bestAsk.Price > in.Price {
 			break
 		}
 
-		qty := minU64(in.remaining, bestAsk.remaining)
+		qty := minU64(in.Size, bestAsk.Size)
 		out = append(out, executed{
 			symbol:   symbol,
-			price:    bestAsk.price,
+			price:    bestAsk.Price,
 			size:     qty,
-			buyID:    in.id,
-			sellID:   bestAsk.id,
+			buyID:    in.Id,
+			sellID:   bestAsk.Id,
 			execTime: time.Now().UTC(),
 		})
 
-		in.remaining -= qty
-		bestAsk.remaining -= qty
+		in.Size -= qty
+		bestAsk.Size -= qty
 
-		if bestAsk.remaining == 0 {
+		if bestAsk.Size == 0 {
 			heap.Pop(&ob.asks)
 		}
 	}
 
-	if in.remaining > 0 {
+	if in.Size > 0 {
 		heap.Push(&ob.bids, in)
 	}
 	return out
 }
 
-func matchSell(symbol string, ob *orderBook, in *order) []executed {
+func matchSell(symbol string, ob *orderBook, in *pb.Order) []executed {
 	var out []executed
 
-	for in.remaining > 0 {
+	for in.Size > 0 {
 		bestBid := ob.bids.Peek()
 		if bestBid == nil {
 			break
 		}
 
-		if bestBid.price < in.price {
+		if bestBid.Price < in.Price {
 			break
 		}
 
-		qty := minU64(in.remaining, bestBid.remaining)
+		qty := minU64(in.Size, bestBid.Size)
 		out = append(out, executed{
 			symbol:   symbol,
-			price:    bestBid.price,
+			price:    bestBid.Price,
 			size:     qty,
-			buyID:    bestBid.id,
-			sellID:   in.id,
+			buyID:    bestBid.Id,
+			sellID:   in.Id,
 			execTime: time.Now().UTC(),
 		})
 
-		in.remaining -= qty
-		bestBid.remaining -= qty
+		in.Size -= qty
+		bestBid.Size -= qty
 
-		if bestBid.remaining == 0 {
+		if bestBid.Size == 0 {
 			heap.Pop(&ob.bids)
 		}
 	}
 
-	if in.remaining > 0 {
+	if in.Size > 0 {
 		heap.Push(&ob.asks, in)
 	}
 	return out

@@ -20,3 +20,14 @@ message Trade {
   // Size in ones. Cannot be a fraction.
   uint64 size = 4;
 }
+
+message Order {
+  // ID of the request that produced this order
+  string id = 1;
+  // Price in millis
+  uint64 price = 2;
+  // Size of the order
+  uint64 size = 3;
+  // Sequence ID in the orderbook
+  uint64 seq = 4;
+}
