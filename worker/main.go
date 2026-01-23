@@ -43,7 +43,6 @@ type WorkerHandler struct {
 	mode             string
 	executedProducer *TopicProducer
 	snapshotProducer *TopicProducer
-	snapshotTopic    string
 	// Snapshot topic client for creating consumers that recover data from this topic
 	snapshotClient sarama.Client
 
@@ -117,7 +116,8 @@ func (h *WorkerHandler) Setup(_ sarama.ConsumerGroupSession) error   { return ni
 func (h *WorkerHandler) Cleanup(_ sarama.ConsumerGroupSession) error { return nil }
 
 func (h *WorkerHandler) findSnapshotRecoveryOrDefault(symbol string, snap *Snapshotter) *orderBook {
-	snapshot, err := snap.GetSnapshotForSymbol(symbol, h.snapshotTopic, h.snapshotClient)
+	slog.Debug("WORKER: looking for snapshot order book...", "symbol", symbol)
+	snapshot, err := snap.GetSnapshotForSymbol(symbol, h.snapshotProducer.topic, h.snapshotClient)
 	if err != nil {
 		slog.Warn("WORKER: failed to fetch snapshot", "symbol", symbol)
 	}
