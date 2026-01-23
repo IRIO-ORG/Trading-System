@@ -134,6 +134,7 @@ func (s *Snapshotter) findSnapshotInPartition(symbol string, topic string, parti
 	for lastOffset < newestOffset {
 		select {
 		case msg := <-pc.Messages():
+			lastOffset = msg.Offset
 			if string(msg.Key) != symbol {
 				continue
 			}
@@ -146,7 +147,6 @@ func (s *Snapshotter) findSnapshotInPartition(symbol string, topic string, parti
 			if latestSnapshot == nil || latestSnapshot.OrderbookSeq < snapshot.OrderbookSeq || latestSnapshot.CreatedAt.AsTime().Before(snapshot.CreatedAt.AsTime()) {
 				latestSnapshot = snapshot
 			}
-			lastOffset = msg.Offset
 
 		case err := <-pc.Errors():
 			return nil, fmt.Errorf("consumer error: %w", err)
