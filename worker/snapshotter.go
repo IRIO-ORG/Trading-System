@@ -8,6 +8,7 @@ import (
 
 	"github.com/IBM/sarama"
 	pb "github.com/IRIO-ORG/Trading-System/proto"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -119,6 +120,7 @@ func (s *Snapshotter) flush(reason string) {
 }
 
 func (s *Snapshotter) findSnapshotInPartition(symbol string, topic string, partition int32, newestOffset int64, topicConsumer sarama.Consumer) (*pb.OrderBookSnapshot, error) {
+	slog.Info("WORKER: looking for snapshot in partition", "symbol", symbol, "topic", topic, "partition", partition, "newestOffset", newestOffset)
 	if newestOffset == 0 {
 		// Partition is empty - no snapshots
 		return nil, nil
@@ -134,6 +136,7 @@ func (s *Snapshotter) findSnapshotInPartition(symbol string, topic string, parti
 	for lastOffset < newestOffset-1 {
 		select {
 		case msg := <-pc.Messages():
+			slog.Debug("WORKER: received snapshot message", "lastOffset", lastOffset, "msg.Offset", msg.Offset, "msg.Key", msg.Key, "symbol", symbol)
 			lastOffset = msg.Offset
 			if string(msg.Key) != symbol {
 				continue
@@ -143,6 +146,17 @@ func (s *Snapshotter) findSnapshotInPartition(symbol string, topic string, parti
 				slog.Warn("Error unmarshalling snapshot", "symbol", symbol, "error", err)
 				continue
 			}
+			{
+				marshaler := protojson.MarshalOptions{
+					Multiline:       false,
+					EmitUnpopulated: true,
+				}
+				jsonReq, err := marshaler.Marshal(snapshot)
+				if err != nil {
+					slog.Warn("WORKER: Marshal error", "error", err)
+				}
+				slog.Info("WORKER: proto unmarshalled", "snapshot", jsonReq)
+			}
 			// Log compaction runs asynchronously, so there may be outdated snapshots
 			if latestSnapshot == nil || latestSnapshot.OrderbookSeq < snapshot.OrderbookSeq || latestSnapshot.CreatedAt.AsTime().Before(snapshot.CreatedAt.AsTime()) {
 				latestSnapshot = snapshot
@@ -151,6 +165,20 @@ func (s *Snapshotter) findSnapshotInPartition(symbol string, topic string, parti
 		case err := <-pc.Errors():
 			return nil, fmt.Errorf("consumer error: %w", err)
 		}
+	}
+	if latestSnapshot != nil {
+		marshaler := protojson.MarshalOptions{
+			Multiline:       false,
+			EmitUnpopulated: true,
+		}
+		jsonReq, err := marshaler.Marshal(latestSnapshot)
+		if err != nil {
+			slog.Warn("WORKER: marshall err", "error", err)
+		}
+		slog.Info("WORKER: ending!", "snapshot", jsonReq)
+	} else {
+		slog.Info("WORKER: ending!", "snapshot", "nil")
+
 	}
 	return latestSnapshot, nil
 }
@@ -184,7 +212,9 @@ func (s *Snapshotter) GetSnapshotForSymbol(symbol string, topic string, client s
 			slog.Info("WORKER: snapshot not found", "symbol", symbol, "partition", partition, "newestOffset", newestOffset, "topic", topic)
 			continue
 		}
+		slog.Info("WORKER: Retrieved snapshot")
 		if latestSnapshot == nil || latestSnapshot.OrderbookSeq < snapshot.OrderbookSeq || latestSnapshot.CreatedAt.AsTime().Before(snapshot.CreatedAt.AsTime()) {
+			slog.Info("WORKER: overriding latest snapshot", "is nil?", latestSnapshot)
 			latestSnapshot = snapshot
 		}
 	}

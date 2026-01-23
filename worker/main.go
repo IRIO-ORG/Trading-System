@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/IBM/sarama"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -22,7 +23,7 @@ const (
 	defaultConsumerGroupID = "worker-group"
 	defaultWorkerMode      = "engine"
 
-	defaultSnapshotIntervalSeconds = 40
+	defaultSnapshotIntervalSeconds = 20
 	defaultSnapshotThreshold       = 10
 )
 
@@ -119,10 +120,22 @@ func (h *WorkerHandler) findSnapshotRecoveryOrDefault(symbol string, snap *Snaps
 	slog.Debug("WORKER: looking for snapshot order book...", "symbol", symbol)
 	snapshot, err := snap.GetSnapshotForSymbol(symbol, h.snapshotProducer.topic, h.snapshotClient)
 	if err != nil {
-		slog.Warn("WORKER: failed to fetch snapshot", "symbol", symbol)
+		slog.Warn("WORKER: failed to fetch snapshot", "symbol", symbol, "error", err)
 	}
 	if snapshot == nil {
+		slog.Info("WORKER: snapshot not found in Kafka, restoring to default", "symbol", symbol)
 		snapshot = &pb.OrderBookSnapshot{}
+	} else {
+		m := protojson.MarshalOptions{
+			Indent:          "  ",
+			EmitUnpopulated: true,
+			UseProtoNames:   true,
+		}
+		bytes, err := m.Marshal(snapshot)
+		if err != nil {
+			panic(err)
+		}
+		slog.Info("WORKER: snapshot restored form Kafka", "symbol", symbol, "snapshot", string(bytes))
 	}
 	return newOrderBookFromSnapshot(snapshot)
 }
