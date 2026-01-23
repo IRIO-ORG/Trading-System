@@ -131,9 +131,10 @@ func (s *Snapshotter) findSnapshotInPartition(symbol string, topic string, parti
 
 	var latestSnapshot *pb.OrderBookSnapshot = nil
 	var lastOffset int64 = -1
-	for lastOffset < newestOffset {
+	for lastOffset < newestOffset-1 {
 		select {
 		case msg := <-pc.Messages():
+			lastOffset = msg.Offset
 			if string(msg.Key) != symbol {
 				continue
 			}
@@ -146,7 +147,6 @@ func (s *Snapshotter) findSnapshotInPartition(symbol string, topic string, parti
 			if latestSnapshot == nil || latestSnapshot.OrderbookSeq < snapshot.OrderbookSeq || latestSnapshot.CreatedAt.AsTime().Before(snapshot.CreatedAt.AsTime()) {
 				latestSnapshot = snapshot
 			}
-			lastOffset = msg.Offset
 
 		case err := <-pc.Errors():
 			return nil, fmt.Errorf("consumer error: %w", err)
