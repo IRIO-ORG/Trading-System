@@ -146,7 +146,7 @@ func (h *WorkerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim 
 
 	var snapper *Snapshotter
 	if h.mode == "engine" {
-		snapper = NewSnapshotter(int32(partition), h.snapshotInterval, h.snapshotThreshold, eng, h.snapshotProducer)
+		snapper = NewSnapshotter(int32(partition), h.snapshotInterval, h.snapshotThreshold, eng, h.snapshotProducer, &session)
 		snapper.Start()
 		defer snapper.Stop()
 	}
@@ -200,7 +200,7 @@ func (h *WorkerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim 
 
 		if len(execs) == 0 {
 			if snapper != nil {
-				snapper.ObserveProcessed(msg.Offset)
+				snapper.ObserveProcessed(msg)
 			}
 			eng.mut.Unlock()
 			slog.Info("WORKER: accepted (no match)",
@@ -209,7 +209,10 @@ func (h *WorkerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim 
 				"partition", partition,
 				"offset", msg.Offset,
 			)
-			session.MarkMessage(msg, "")
+			// Otherwise snapshotter will commit the message when appropriate
+			if snapper == nil {
+				session.MarkMessage(msg, "")
+			}
 			continue
 		}
 
@@ -236,11 +239,14 @@ func (h *WorkerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim 
 		}
 
 		if snapper != nil {
-			snapper.ObserveProcessed(msg.Offset)
+			snapper.ObserveProcessed(msg)
 		}
 		eng.mut.Unlock()
 
-		session.MarkMessage(msg, "")
+		// Otherwise snapshotter will commit the message when appropriate
+		if snapper == nil {
+			session.MarkMessage(msg, "")
+		}
 	}
 	return nil
 }

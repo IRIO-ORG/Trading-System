@@ -20,7 +20,7 @@ import (
 type Snapshotter struct {
 	partition int32
 	interval  time.Duration
-	maxOrders int64
+	maxOrders int
 
 	eng      *engine
 	producer *TopicProducer
@@ -28,23 +28,26 @@ type Snapshotter struct {
 	snapshotClient sarama.Client
 
 	lastOffset      atomic.Int64
-	ordersSinceSnap atomic.Int64
+	ordersSinceSnap []*sarama.ConsumerMessage
+	session         *sarama.ConsumerGroupSession
 
 	triggerCh chan struct{}
 	stopCh    chan struct{}
 	stoppedCh chan struct{}
 }
 
-func NewSnapshotter(partition int32, interval time.Duration, maxOrders int, eng *engine, producer *TopicProducer) *Snapshotter {
+func NewSnapshotter(partition int32, interval time.Duration, maxOrders int, eng *engine, producer *TopicProducer, session *sarama.ConsumerGroupSession) *Snapshotter {
 	s := &Snapshotter{
-		partition: partition,
-		interval:  interval,
-		maxOrders: int64(maxOrders),
-		eng:       eng,
-		producer:  producer,
-		triggerCh: make(chan struct{}, 1),
-		stopCh:    make(chan struct{}),
-		stoppedCh: make(chan struct{}),
+		partition:       partition,
+		interval:        interval,
+		maxOrders:       maxOrders,
+		eng:             eng,
+		producer:        producer,
+		ordersSinceSnap: make([]*sarama.ConsumerMessage, 0),
+		session:         session,
+		triggerCh:       make(chan struct{}, 1),
+		stopCh:          make(chan struct{}),
+		stoppedCh:       make(chan struct{}),
 	}
 	s.lastOffset.Store(-1)
 	return s
@@ -59,14 +62,15 @@ func (s *Snapshotter) Stop() {
 
 // ObserveProcessed should be called after a trade request has been fully processed
 // (including emitting executed-trade events, if any).
-func (s *Snapshotter) ObserveProcessed(offset int64) {
-	s.lastOffset.Store(offset)
+func (s *Snapshotter) ObserveProcessed(msg *sarama.ConsumerMessage) {
+	s.lastOffset.Store(msg.Offset)
 
 	if s.maxOrders <= 0 {
 		return
 	}
 
-	if s.ordersSinceSnap.Add(1) >= s.maxOrders {
+	s.ordersSinceSnap = append(s.ordersSinceSnap, msg)
+	if len(s.ordersSinceSnap) >= s.maxOrders {
 		select {
 		case s.triggerCh <- struct{}{}:
 		default:
@@ -93,8 +97,6 @@ func (s *Snapshotter) loop() {
 }
 
 func (s *Snapshotter) flush(reason string) {
-	s.ordersSinceSnap.Store(0)
-
 	s.eng.mut.Lock()
 	offset := s.lastOffset.Load()
 	if offset < 0 {
@@ -103,6 +105,14 @@ func (s *Snapshotter) flush(reason string) {
 	}
 	createdAt := time.Now().UTC()
 	snaps := s.eng.createSnapshotLocked(createdAt, s.partition, offset)
+
+	// Commit the messages
+	slog.Info("WORKER: commiting messages", "count", len(s.ordersSinceSnap))
+	for _, msg := range s.ordersSinceSnap {
+		(*s.session).MarkMessage(msg, "")
+	}
+	s.ordersSinceSnap = make([]*sarama.ConsumerMessage, 0)
+
 	s.eng.mut.Unlock()
 	if len(snaps) == 0 {
 		return
