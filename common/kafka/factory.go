@@ -68,3 +68,14 @@ func NewConsumerGroup(groupID string) (sarama.ConsumerGroup, error) {
 	}
 	return nil, fmt.Errorf("failed to start consumer group after retries: %w", err)
 }
+
+func NewClient() (sarama.Client, error) {
+	brokers := getBrokers()
+
+	config := sarama.NewConfig()
+	config.Consumer.Return.Errors = true
+	config.Consumer.Offsets.Initial = sarama.OffsetOldest
+	config.Consumer.Group.Rebalance.Strategy = sarama.NewBalanceStrategySticky()
+
+	return sarama.NewClient(brokers, config)
+}

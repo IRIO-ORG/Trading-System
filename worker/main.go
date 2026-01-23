@@ -91,12 +91,19 @@ func main() {
 		}
 	}()
 
+	snapshotClient, err := kafka.NewClient()
+	if err != nil {
+		slog.Error("WORKER: Can't create snapshot client", "error", err)
+		os.Exit(1)
+	}
+
 	handler := &WorkerHandler{
 		mode:              mode,
 		executedProducer:  NewTopicProducer(executedTopic, executedTradesProducer),
 		snapshotProducer:  NewTopicProducer(snapshotsTopic, snapshotsProducer),
 		snapshotInterval:  snapInterval,
 		snapshotThreshold: snapThreshold,
+		snapshotClient:    snapshotClient,
 	}
 
 	err = kafka.RunConsumerGroup(groupID, []string{requestsTopic}, handler)
