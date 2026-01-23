@@ -8,6 +8,7 @@ import (
 
 	"github.com/IBM/sarama"
 	pb "github.com/IRIO-ORG/Trading-System/proto"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -19,7 +20,7 @@ import (
 type Snapshotter struct {
 	partition int32
 	interval  time.Duration
-	maxOrders int64
+	maxOrders int
 
 	eng      *engine
 	producer *TopicProducer
@@ -27,23 +28,26 @@ type Snapshotter struct {
 	snapshotClient sarama.Client
 
 	lastOffset      atomic.Int64
-	ordersSinceSnap atomic.Int64
+	ordersSinceSnap []*sarama.ConsumerMessage
+	session         *sarama.ConsumerGroupSession
 
 	triggerCh chan struct{}
 	stopCh    chan struct{}
 	stoppedCh chan struct{}
 }
 
-func NewSnapshotter(partition int32, interval time.Duration, maxOrders int, eng *engine, producer *TopicProducer) *Snapshotter {
+func NewSnapshotter(partition int32, interval time.Duration, maxOrders int, eng *engine, producer *TopicProducer, session *sarama.ConsumerGroupSession) *Snapshotter {
 	s := &Snapshotter{
-		partition: partition,
-		interval:  interval,
-		maxOrders: int64(maxOrders),
-		eng:       eng,
-		producer:  producer,
-		triggerCh: make(chan struct{}, 1),
-		stopCh:    make(chan struct{}),
-		stoppedCh: make(chan struct{}),
+		partition:       partition,
+		interval:        interval,
+		maxOrders:       maxOrders,
+		eng:             eng,
+		producer:        producer,
+		ordersSinceSnap: make([]*sarama.ConsumerMessage, 0),
+		session:         session,
+		triggerCh:       make(chan struct{}, 1),
+		stopCh:          make(chan struct{}),
+		stoppedCh:       make(chan struct{}),
 	}
 	s.lastOffset.Store(-1)
 	return s
@@ -58,14 +62,15 @@ func (s *Snapshotter) Stop() {
 
 // ObserveProcessed should be called after a trade request has been fully processed
 // (including emitting executed-trade events, if any).
-func (s *Snapshotter) ObserveProcessed(offset int64) {
-	s.lastOffset.Store(offset)
+func (s *Snapshotter) ObserveProcessed(msg *sarama.ConsumerMessage) {
+	s.lastOffset.Store(msg.Offset)
 
 	if s.maxOrders <= 0 {
 		return
 	}
 
-	if s.ordersSinceSnap.Add(1) >= s.maxOrders {
+	s.ordersSinceSnap = append(s.ordersSinceSnap, msg)
+	if len(s.ordersSinceSnap) >= s.maxOrders {
 		select {
 		case s.triggerCh <- struct{}{}:
 		default:
@@ -92,8 +97,6 @@ func (s *Snapshotter) loop() {
 }
 
 func (s *Snapshotter) flush(reason string) {
-	s.ordersSinceSnap.Store(0)
-
 	s.eng.mut.Lock()
 	offset := s.lastOffset.Load()
 	if offset < 0 {
@@ -102,6 +105,14 @@ func (s *Snapshotter) flush(reason string) {
 	}
 	createdAt := time.Now().UTC()
 	snaps := s.eng.createSnapshotLocked(createdAt, s.partition, offset)
+
+	// Commit the messages
+	slog.Info("WORKER: commiting messages", "count", len(s.ordersSinceSnap))
+	for _, msg := range s.ordersSinceSnap {
+		(*s.session).MarkMessage(msg, "")
+	}
+	s.ordersSinceSnap = make([]*sarama.ConsumerMessage, 0)
+
 	s.eng.mut.Unlock()
 	if len(snaps) == 0 {
 		return
@@ -119,6 +130,7 @@ func (s *Snapshotter) flush(reason string) {
 }
 
 func (s *Snapshotter) findSnapshotInPartition(symbol string, topic string, partition int32, newestOffset int64, topicConsumer sarama.Consumer) (*pb.OrderBookSnapshot, error) {
+	slog.Info("WORKER: looking for snapshot in partition", "symbol", symbol, "topic", topic, "partition", partition, "newestOffset", newestOffset)
 	if newestOffset == 0 {
 		// Partition is empty - no snapshots
 		return nil, nil
@@ -134,6 +146,7 @@ func (s *Snapshotter) findSnapshotInPartition(symbol string, topic string, parti
 	for lastOffset < newestOffset-1 {
 		select {
 		case msg := <-pc.Messages():
+			slog.Debug("WORKER: received snapshot message", "lastOffset", lastOffset, "msg.Offset", msg.Offset, "msg.Key", msg.Key, "symbol", symbol)
 			lastOffset = msg.Offset
 			if string(msg.Key) != symbol {
 				continue
@@ -143,6 +156,17 @@ func (s *Snapshotter) findSnapshotInPartition(symbol string, topic string, parti
 				slog.Warn("Error unmarshalling snapshot", "symbol", symbol, "error", err)
 				continue
 			}
+			{
+				marshaler := protojson.MarshalOptions{
+					Multiline:       false,
+					EmitUnpopulated: true,
+				}
+				jsonReq, err := marshaler.Marshal(snapshot)
+				if err != nil {
+					slog.Warn("WORKER: Marshal error", "error", err)
+				}
+				slog.Info("WORKER: proto unmarshalled", "snapshot", jsonReq)
+			}
 			// Log compaction runs asynchronously, so there may be outdated snapshots
 			if latestSnapshot == nil || latestSnapshot.OrderbookSeq < snapshot.OrderbookSeq || latestSnapshot.CreatedAt.AsTime().Before(snapshot.CreatedAt.AsTime()) {
 				latestSnapshot = snapshot
@@ -151,6 +175,20 @@ func (s *Snapshotter) findSnapshotInPartition(symbol string, topic string, parti
 		case err := <-pc.Errors():
 			return nil, fmt.Errorf("consumer error: %w", err)
 		}
+	}
+	if latestSnapshot != nil {
+		marshaler := protojson.MarshalOptions{
+			Multiline:       false,
+			EmitUnpopulated: true,
+		}
+		jsonReq, err := marshaler.Marshal(latestSnapshot)
+		if err != nil {
+			slog.Warn("WORKER: marshall err", "error", err)
+		}
+		slog.Info("WORKER: ending!", "snapshot", jsonReq)
+	} else {
+		slog.Info("WORKER: ending!", "snapshot", "nil")
+
 	}
 	return latestSnapshot, nil
 }
@@ -184,7 +222,9 @@ func (s *Snapshotter) GetSnapshotForSymbol(symbol string, topic string, client s
 			slog.Info("WORKER: snapshot not found", "symbol", symbol, "partition", partition, "newestOffset", newestOffset, "topic", topic)
 			continue
 		}
+		slog.Info("WORKER: Retrieved snapshot")
 		if latestSnapshot == nil || latestSnapshot.OrderbookSeq < snapshot.OrderbookSeq || latestSnapshot.CreatedAt.AsTime().Before(snapshot.CreatedAt.AsTime()) {
+			slog.Info("WORKER: overriding latest snapshot", "is nil?", latestSnapshot)
 			latestSnapshot = snapshot
 		}
 	}
