@@ -22,6 +22,10 @@ controller:
 # Allow to run multiple kafka instances on one node
 podAntiAffinityPreset: "soft"
 
+extraEnvVars:
+  - name: KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE
+    value: "false"
+
 listeners:
   client:
     protocol: PLAINTEXT
