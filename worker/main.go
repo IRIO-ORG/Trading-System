@@ -22,7 +22,7 @@ const (
 	defaultConsumerGroupID = "worker-group"
 	defaultWorkerMode      = "engine"
 
-	defaultSnapshotIntervalSeconds = 20 // Na testy
+	defaultSnapshotIntervalSeconds = 40
 	defaultSnapshotThreshold       = 10
 )
 
