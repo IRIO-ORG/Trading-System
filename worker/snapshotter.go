@@ -131,7 +131,7 @@ func (s *Snapshotter) findSnapshotInPartition(symbol string, topic string, parti
 
 	var latestSnapshot *pb.OrderBookSnapshot = nil
 	var lastOffset int64 = -1
-	for lastOffset < newestOffset {
+	for lastOffset < newestOffset-1 {
 		select {
 		case msg := <-pc.Messages():
 			lastOffset = msg.Offset
@@ -156,25 +156,32 @@ func (s *Snapshotter) findSnapshotInPartition(symbol string, topic string, parti
 }
 
 func (s *Snapshotter) GetSnapshotForSymbol(symbol string, topic string, client sarama.Client) (*pb.OrderBookSnapshot, error) {
+	partitions, err := client.Partitions(topic)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get partitions for topic %s: %w", topic, err)
+	}
+
 	consumer, err := sarama.NewConsumerFromClient(client)
 	if err != nil {
 		return nil, fmt.Errorf("NewConsumerFromClient error: %v", err)
 	}
 	defer consumer.Close()
-	watermarksPerTopicAndPartition := consumer.HighWaterMarks()
-	watermarks, exists := watermarksPerTopicAndPartition[topic]
-	if !exists {
-		return nil, nil
-	}
 
 	var latestSnapshot *pb.OrderBookSnapshot = nil
-	for partition, watermark := range watermarks {
-		snapshot, err := s.findSnapshotInPartition(symbol, topic, partition, watermark, consumer)
+	for _, partition := range partitions {
+		newestOffset, err := client.GetOffset(topic, partition, sarama.OffsetNewest)
 		if err != nil {
-			slog.Warn("Error when looking for snapshot in partition", "symbol", symbol, "topic", topic, "partition", partition)
+			slog.Warn("Failed to get offset for partition", "partition", partition, "error", err)
+			continue
+		}
+
+		snapshot, err := s.findSnapshotInPartition(symbol, topic, partition, newestOffset, consumer)
+		if err != nil {
+			slog.Warn("WORKER: Error when looking for snapshot in partition", "symbol", symbol, "topic", topic, "partition", partition)
 			continue
 		}
 		if snapshot == nil {
+			slog.Info("WORKER: snapshot not found", "symbol", symbol, "partition", partition, "newestOffset", newestOffset, "topic", topic)
 			continue
 		}
 		if latestSnapshot == nil || latestSnapshot.OrderbookSeq < snapshot.OrderbookSeq || latestSnapshot.CreatedAt.AsTime().Before(snapshot.CreatedAt.AsTime()) {
